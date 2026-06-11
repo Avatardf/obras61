@@ -134,7 +134,7 @@ function ChartTooltip({ active, payload, label }: {
 
 function SkeletonDashboard() {
   return (
-    <div className="p-6 space-y-5 animate-pulse">
+    <div className="p-4 sm:p-6 space-y-5 animate-pulse">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[1, 2, 3, 4].map(i => (
           <div key={i} className="bg-white/80 rounded-2xl border border-slate-200 h-28" />
@@ -176,7 +176,7 @@ export function Dashboard() {
   }
 
   return (
-    <div className="p-6 space-y-6 animate-fade-in">
+    <div className="p-4 sm:p-6 space-y-6 animate-fade-in">
 
       {/* ── KPI Cards ────────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -307,7 +307,7 @@ export function Dashboard() {
 
       {/* ── Obras recentes ────────────────────────────────────────────────────── */}
       <div className="card overflow-hidden">
-        <div className="px-6 pt-5 pb-0">
+        <div className="px-4 sm:px-6 pt-5 pb-0">
           <SectionTitle
             icon={Building2}
             title="Obras recentes"
@@ -320,7 +320,7 @@ export function Dashboard() {
         </div>
 
         {stats.obras_recentes.length === 0 ? (
-          <div className="px-6 py-12 text-center text-slate-400">
+          <div className="px-4 sm:px-6 py-12 text-center text-slate-400">
             <Building2 size={32} className="mx-auto mb-2 opacity-20" />
             <p className="text-sm font-medium text-slate-500">Nenhuma obra cadastrada</p>
             <p className="text-xs mt-1">Acesse Empreendimentos e crie a primeira obra</p>

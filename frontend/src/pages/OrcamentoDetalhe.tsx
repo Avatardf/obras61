@@ -187,7 +187,7 @@ export function OrcamentoDetalhe() {
 
   if (isLoading) {
     return (
-      <div className="p-6 space-y-4 animate-pulse">
+      <div className="p-4 sm:p-6 space-y-4 animate-pulse">
         <div className="h-6 bg-slate-200 rounded w-1/3" />
         <div className="h-4 bg-slate-100 rounded w-1/4" />
         <div className="h-64 bg-white border border-slate-200 rounded-xl" />
@@ -201,7 +201,7 @@ export function OrcamentoDetalhe() {
   const bacComBdi = orc.valor_total * (1 + orc.bdi_percentual / 100);
 
   return (
-    <div className="p-6 space-y-5">
+    <div className="p-4 sm:p-6 space-y-5">
 
       {/* Cabeçalho */}
       <div className="flex items-start gap-4">

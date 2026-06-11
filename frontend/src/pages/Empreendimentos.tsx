@@ -92,7 +92,7 @@ export function Empreendimentos() {
   const totalPaginas = data ? Math.ceil(data.total / data.por_pagina) : 0;
 
   return (
-    <div className="p-6 space-y-5">
+    <div className="p-4 sm:p-6 space-y-5">
 
       {/* ── Tabs: Ativos | Lixeira ───────────────────────────────────── */}
       <div className="border-b border-slate-200 -mb-1">
@@ -426,7 +426,7 @@ function ExclusaoPermanenteModal({
           </div>
         </div>
 
-        <div className="p-6 space-y-4">
+        <div className="p-4 sm:p-6 space-y-4">
           <div className="bg-red-50 border-l-4 border-red-600 rounded-r-lg px-4 py-3">
             <p className="text-sm text-red-900 font-bold leading-relaxed mb-2">
               🚨 Tudo será PERDIDO permanentemente:
@@ -465,7 +465,7 @@ function ExclusaoPermanenteModal({
           )}
         </div>
 
-        <div className="px-6 pb-6 flex items-center gap-2 justify-end">
+        <div className="px-4 sm:px-6 pb-6 flex items-center gap-2 justify-end">
           <button onClick={onCancelar}
             className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors">
             Cancelar

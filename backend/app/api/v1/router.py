@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.v1 import auth, catalogo, centro_custo, dashboard, empreendimentos, financeiro, obras, orcamentos, rdo, suprimentos, vision
+from app.api.v1 import auth, catalogo, centro_custo, conciliacao, dashboard, documentos, empreendimentos, financeiro, obras, orcamentos, rdo, suprimentos, usuarios, vision
 
 router = APIRouter(prefix="/api/v1")
 
@@ -15,3 +15,6 @@ router.include_router(suprimentos.router)     # /fornecedores + /estoque + /requ
 router.include_router(financeiro.router)      # /financeiro + /obras/{id}/financeiro
 router.include_router(catalogo.router)        # /materiais + /materiais/familias
 router.include_router(centro_custo.router)    # /obras/{id}/centro-custo
+router.include_router(usuarios.router)        # /usuarios — gerenciamento de usuários (admin)
+router.include_router(conciliacao.router)     # /conciliacao/upload + /conciliacao/finalizar
+router.include_router(documentos.router)      # /empreendimentos/{id}/documentos + /documentos/matriz

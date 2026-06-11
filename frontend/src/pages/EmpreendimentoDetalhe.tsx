@@ -1,11 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Building2, Plus, Sparkles, ClipboardList } from "lucide-react";
+import { ArrowLeft, Building2, Plus, Sparkles, ClipboardList, FileText } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { empreendimentosApi, obrasApi } from "@/api/client";
 import { ObraForm } from "@/components/obras/ObraForm";
 import { EmpreendimentoForm } from "@/components/empreendimentos/EmpreendimentoForm";
 import { EstimativaCustos } from "@/components/empreendimentos/EstimativaCustos";
+import { DocumentosTab } from "@/components/empreendimentos/DocumentosTab";
 import { Badge } from "@/components/ui/Badge";
 import type { ObraResponse, EmpreendimentoResponse } from "@/types";
 import { clsx } from "clsx";
@@ -66,7 +67,7 @@ export function EmpreendimentoDetalhe() {
   const navigate = useNavigate();
   const [formAberto, setFormAberto] = useState(false);
   const [editarEmpAberto, setEditarEmpAberto] = useState(false);
-  const [aba, setAba] = useState<"obras" | "estimativas">("obras");
+  const [aba, setAba] = useState<"obras" | "estimativas" | "documentos">("obras");
 
   const { data: emp } = useQuery<EmpreendimentoResponse>({
     queryKey: ["empreendimento", id],
@@ -81,7 +82,7 @@ export function EmpreendimentoDetalhe() {
   });
 
   return (
-    <div className="p-6 space-y-5">
+    <div className="p-4 sm:p-6 space-y-5">
       {/* Cabeçalho */}
       <div className="flex items-center gap-4">
         <button
@@ -104,6 +105,7 @@ export function EmpreendimentoDetalhe() {
         {aba === "obras" && (
           <button
             onClick={() => setFormAberto(true)}
+
             className="flex items-center gap-2 px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-medium hover:bg-brand-700 transition-colors"
           >
             <Plus size={16} />
@@ -115,8 +117,9 @@ export function EmpreendimentoDetalhe() {
       {/* Abas */}
       <div className="flex gap-1 border-b border-slate-200">
         {([
-          { key: "obras",       label: "Obras",              icon: ClipboardList },
-          { key: "estimativas", label: "Estimativa de Custos IA", icon: Sparkles },
+          { key: "obras",       label: "Obras",                   icon: ClipboardList },
+          { key: "documentos",  label: "Documentos",              icon: FileText      },
+          { key: "estimativas", label: "Estimativa de Custos IA", icon: Sparkles      },
         ] as const).map(({ key, label, icon: Icon }) => (
           <button
             key={key}
@@ -179,6 +182,11 @@ export function EmpreendimentoDetalhe() {
           </div>
         )}
       </>}
+
+      {/* Conteúdo aba Documentos */}
+      {aba === "documentos" && id && (
+        <DocumentosTab empreendimentoId={id} />
+      )}
 
       {/* Conteúdo aba Estimativas */}
       {aba === "estimativas" && emp && (

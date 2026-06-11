@@ -8,16 +8,18 @@ export default defineConfig({
     alias: { "@": path.resolve(__dirname, "./src") },
   },
   server: {
-    port: 5173,
+    port: Number(process.env.PORT) || 5173,
     host: true,
+    allowedHosts: [".trycloudflare.com", "localhost"],
     watch: {
-      // No Windows + Docker, o filesystem não emite eventos de mudança;
-      // o polling garante que o Vite detecte todas as edições.
       usePolling: true,
       interval: 300,
     },
     proxy: {
-      "/api": { target: "http://backend:8000", changeOrigin: true },
+      "/api": {
+        target: process.env.VITE_API_TARGET || "http://localhost:8000",
+        changeOrigin: true,
+      },
     },
   },
 });

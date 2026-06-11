@@ -20,6 +20,13 @@ class Settings(BaseSettings):
     # Redis / Celery
     redis_url: str = "redis://localhost:6379/0"
 
+    # CORS — em produção defina via env var (lista JSON):
+    # ALLOWED_ORIGINS='["https://app.61brasil.com.br"]'
+    allowed_origins: list[str] = [
+        "http://localhost:5173",
+        "http://localhost:3000",
+    ]
+
     # Storage
     storage_bucket: str = "obras-dev"
     storage_endpoint: str | None = None

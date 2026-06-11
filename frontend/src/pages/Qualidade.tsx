@@ -93,7 +93,7 @@ export function Qualidade() {
   }
 
   return (
-    <div className="p-6 space-y-5">
+    <div className="p-4 sm:p-6 space-y-5">
 
       {/* Summary cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

@@ -1,6 +1,8 @@
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+
+const LOGO_ESCURO_URL = "/logo/logo-escuro.png";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus, Trash2, Pencil, Package, ShoppingCart, Truck, Archive,
@@ -573,6 +575,17 @@ function RequisicoesTab() {
   // Quantidades editadas no modal de análise (índice → quantidade nova)
   const [qtdEditada, setQtdEditada] = useState<Record<number, number>>({});
   const [salvandoQtd, setSalvandoQtd] = useState(false);
+  // Logo pré-carregado para uso nos PDFs
+  const logoRef = useRef<HTMLImageElement | null>(null);
+  useEffect(() => {
+    const img = new Image();
+    img.src = LOGO_ESCURO_URL;
+    img.onload = () => { logoRef.current = img; };
+  }, []);
+  // Filtros
+  const [buscaReq, setBuscaReq] = useState("");
+  const [filtroStatusReq, setFiltroStatusReq] = useState("");
+  const [filtroPrioridade, setFiltroPrioridade] = useState("");
 
   // Estoque do almoxarifado para cruzamento com itens da requisição
   const { data: estoqueAlmox = [] } = useQuery<EstoqueItem[]>({
@@ -671,15 +684,16 @@ function RequisicoesTab() {
     const YELLOW: [number, number, number] = [255, 251, 235];
 
     // ── Cabeçalho ──────────────────────────────────────────────────────────────
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(18);
-    doc.setTextColor(...BLUE);
-    doc.text("Gestão de Obras", ML, 18);
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(100, 100, 100);
-    doc.text("Sistema de Suprimentos", ML, 23);
+    // Logo à esquerda (largura 44mm, altura 11mm ≈ proporção 4:1)
+    if (logoRef.current) {
+      doc.addImage(logoRef.current, "PNG", ML, 10, 44, 11);
+    } else {
+      // Fallback textual caso a imagem ainda não tenha carregado
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(14);
+      doc.setTextColor(...BLUE);
+      doc.text("61Brasil", ML, 18);
+    }
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(13);
@@ -883,7 +897,7 @@ function RequisicoesTab() {
       doc.setFontSize(7);
       doc.setTextColor(148, 163, 184);
       doc.text(
-        `Documento gerado em ${hoje}  ·  ${req.numero}  ·  Este documento não tem valor fiscal  ·  Sistema de Gestão de Obras  ·  Pág. ${p}/${pageCount}`,
+        `Documento gerado em ${hoje}  ·  ${req.numero}  ·  Este documento não tem valor fiscal  ·  61Brasil Construtora & Incorporadora  ·  Pág. ${p}/${pageCount}`,
         PW / 2, 289, { align: "center" }
       );
     }
@@ -980,6 +994,16 @@ function RequisicoesTab() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["requisicoes"] }),
   });
 
+  const reqFiltradas = useMemo(() => {
+    const q = buscaReq.toLowerCase().trim();
+    return requisicoes.filter(r => {
+      const matchQ = !q || r.numero.toLowerCase().includes(q) || r.solicitante.toLowerCase().includes(q);
+      const matchS = !filtroStatusReq || r.status === filtroStatusReq;
+      const matchP = !filtroPrioridade || r.prioridade === filtroPrioridade;
+      return matchQ && matchS && matchP;
+    });
+  }, [requisicoes, buscaReq, filtroStatusReq, filtroPrioridade]);
+
   return (
     <>
       <div className="flex justify-end gap-2 mb-4">
@@ -999,11 +1023,48 @@ function RequisicoesTab() {
         </button>
       </div>
 
+      {/* Filtros */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        <input
+          type="text"
+          placeholder="Buscar por número ou solicitante…"
+          value={buscaReq}
+          onChange={e => setBuscaReq(e.target.value)}
+          className="flex-1 min-w-[200px] text-sm px-3 py-1.5 border border-slate-200 rounded-lg outline-none focus:border-brand-400 bg-white"
+        />
+        <select
+          value={filtroStatusReq}
+          onChange={e => setFiltroStatusReq(e.target.value)}
+          className="text-sm px-3 py-1.5 border border-slate-200 rounded-lg bg-white text-slate-600 outline-none focus:border-brand-400">
+          <option value="">Todos os status</option>
+          {Object.entries(STATUS_REQ_LABELS).map(([v, l]) => (
+            <option key={v} value={v}>{l}</option>
+          ))}
+        </select>
+        <select
+          value={filtroPrioridade}
+          onChange={e => setFiltroPrioridade(e.target.value)}
+          className="text-sm px-3 py-1.5 border border-slate-200 rounded-lg bg-white text-slate-600 outline-none focus:border-brand-400">
+          <option value="">Todas as prioridades</option>
+          <option value="baixa">Baixa</option>
+          <option value="normal">Normal</option>
+          <option value="alta">Alta</option>
+          <option value="urgente">Urgente</option>
+        </select>
+        {(buscaReq || filtroStatusReq || filtroPrioridade) && (
+          <button
+            onClick={() => { setBuscaReq(""); setFiltroStatusReq(""); setFiltroPrioridade(""); }}
+            className="text-xs text-slate-400 hover:text-slate-600 px-2 py-1.5 border border-slate-200 rounded-lg bg-white">
+            Limpar
+          </button>
+        )}
+      </div>
+
       {isLoading ? (
         <div className="text-slate-400 text-sm p-6">Carregando…</div>
       ) : (
         <div className="space-y-2">
-          {requisicoes.map(r => (
+          {reqFiltradas.map(r => (
             <div key={r.id} className="border border-slate-200 rounded-lg p-4 hover:border-slate-300 transition-colors">
               <div className="flex items-center justify-between gap-3">
                 {/* Esquerda: badges */}
@@ -1049,8 +1110,10 @@ function RequisicoesTab() {
               )}
             </div>
           ))}
-          {requisicoes.length === 0 && (
-            <div className="py-12 text-center text-slate-400">Nenhuma requisição registrada</div>
+          {reqFiltradas.length === 0 && (
+            <div className="py-12 text-center text-slate-400">
+              {requisicoes.length === 0 ? "Nenhuma requisição registrada" : "Nenhuma requisição encontrada para os filtros aplicados"}
+            </div>
           )}
         </div>
       )}
@@ -1485,6 +1548,9 @@ function OrdensCompraTab() {
   // ── Estado: cancelamento com 2 disclaimers ─────────────────────────────────
   const [cancelModal, setCancelModal] = useState<{ oc: OrdemCompra; etapa: EtapaCancelamento; motivo: string } | null>(null);
   const [mostrarArquivadas, setMostrarArquivadas] = useState(false);
+  // Filtros
+  const [buscaOC, setBuscaOC] = useState("");
+  const [filtroStatusOC, setFiltroStatusOC] = useState("");
 
   const { data: ocs = [], isLoading } = useQuery<OrdemCompra[]>({
     queryKey: ["ordens-compra"],
@@ -1495,6 +1561,16 @@ function OrdensCompraTab() {
   const ocsVisiveis = mostrarArquivadas
     ? ocs
     : ocs.filter(oc => oc.status !== "arquivada");
+
+  const ocsFiltradas = useMemo(() => {
+    const q = buscaOC.toLowerCase().trim();
+    return ocsVisiveis.filter(oc => {
+      const matchQ = !q || oc.numero.toLowerCase().includes(q) ||
+        (oc.fornecedor_nome ?? "").toLowerCase().includes(q);
+      const matchS = !filtroStatusOC || oc.status === filtroStatusOC;
+      return matchQ && matchS;
+    });
+  }, [ocsVisiveis, buscaOC, filtroStatusOC]);
 
   const atualizarStatus = useMutation({
     mutationFn: ({ id, status }: { id: string; status: StatusOC }) =>
@@ -1566,17 +1642,46 @@ function OrdensCompraTab() {
         </span>
       </div>
 
+      {/* Filtros */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        <input
+          type="text"
+          placeholder="Buscar por número ou fornecedor…"
+          value={buscaOC}
+          onChange={e => setBuscaOC(e.target.value)}
+          className="flex-1 min-w-[200px] text-sm px-3 py-1.5 border border-slate-200 rounded-lg outline-none focus:border-brand-400 bg-white"
+        />
+        <select
+          value={filtroStatusOC}
+          onChange={e => setFiltroStatusOC(e.target.value)}
+          className="text-sm px-3 py-1.5 border border-slate-200 rounded-lg bg-white text-slate-600 outline-none focus:border-brand-400">
+          <option value="">Todos os status</option>
+          {Object.entries(STATUS_OC_LABELS).map(([v, l]) => (
+            <option key={v} value={v}>{l}</option>
+          ))}
+        </select>
+        {(buscaOC || filtroStatusOC) && (
+          <button
+            onClick={() => { setBuscaOC(""); setFiltroStatusOC(""); }}
+            className="text-xs text-slate-400 hover:text-slate-600 px-2 py-1.5 border border-slate-200 rounded-lg bg-white">
+            Limpar
+          </button>
+        )}
+      </div>
+
       {isLoading ? (
         <div className="text-slate-400 text-sm p-6">Carregando…</div>
-      ) : ocsVisiveis.length === 0 ? (
+      ) : ocs.length === 0 ? (
         <div className="py-16 text-center text-slate-400">
           <Truck size={36} className="mx-auto mb-3 opacity-30" />
           <p className="font-medium">Nenhuma ordem de compra</p>
           <p className="text-xs mt-1">Use o Comparativo na aba Cotações para gerar OCs automaticamente.</p>
         </div>
+      ) : ocsFiltradas.length === 0 ? (
+        <div className="py-12 text-center text-slate-400">Nenhuma OC encontrada para os filtros aplicados</div>
       ) : (
         <div className="space-y-3">
-          {ocsVisiveis.map(oc => {
+          {ocsFiltradas.map(oc => {
             const fin = statusFinanceiroLabel[oc.status as StatusOC];
             const podeAprovar = oc.status === "rascunho";
             const podeCancelar = !["cancelada", "arquivada", "entregue"].includes(oc.status);
@@ -2551,6 +2656,9 @@ function RecebimentosTab() {
   const [aberto, setAberto] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [expandido, setExpandido] = useState<string | null>(null);
+  // Filtros
+  const [buscaRec, setBuscaRec] = useState("");
+  const [filtroStatusRec, setFiltroStatusRec] = useState("");
   // Modal de edição de itens
   const [editModal, setEditModal] = useState<{
     rec: Recebimento;
@@ -2706,6 +2814,17 @@ function RecebimentosTab() {
   const pendentes   = recebimentos.filter(r => r.status === "pendente").length;
   const divergentes = recebimentos.filter(r => r.status === "divergencia").length;
 
+  const recFiltrados = useMemo(() => {
+    const q = buscaRec.toLowerCase().trim();
+    return recebimentos.filter(r => {
+      const matchQ = !q || r.numero.toLowerCase().includes(q) ||
+        (r.nota_fiscal ?? "").toLowerCase().includes(q) ||
+        (r.recebido_por ?? "").toLowerCase().includes(q);
+      const matchS = !filtroStatusRec || r.status === filtroStatusRec;
+      return matchQ && matchS;
+    });
+  }, [recebimentos, buscaRec, filtroStatusRec]);
+
   const obraLabel = (id: string | null) =>
     id ? obras.find(o => o.id === id)?.nome ?? id : "Empresa Geral";
 
@@ -2732,11 +2851,38 @@ function RecebimentosTab() {
         </button>
       </div>
 
+      {/* Filtros */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        <input
+          type="text"
+          placeholder="Buscar por número, NF ou responsável…"
+          value={buscaRec}
+          onChange={e => setBuscaRec(e.target.value)}
+          className="flex-1 min-w-[200px] text-sm px-3 py-1.5 border border-slate-200 rounded-lg outline-none focus:border-brand-400 bg-white"
+        />
+        <select
+          value={filtroStatusRec}
+          onChange={e => setFiltroStatusRec(e.target.value)}
+          className="text-sm px-3 py-1.5 border border-slate-200 rounded-lg bg-white text-slate-600 outline-none focus:border-brand-400">
+          <option value="">Todos os status</option>
+          {Object.entries(STATUS_REC_LABELS).map(([v, l]) => (
+            <option key={v} value={v}>{l}</option>
+          ))}
+        </select>
+        {(buscaRec || filtroStatusRec) && (
+          <button
+            onClick={() => { setBuscaRec(""); setFiltroStatusRec(""); }}
+            className="text-xs text-slate-400 hover:text-slate-600 px-2 py-1.5 border border-slate-200 rounded-lg bg-white">
+            Limpar
+          </button>
+        )}
+      </div>
+
       {isLoading ? (
         <div className="text-slate-400 text-sm p-6">Carregando…</div>
       ) : (
         <div className="space-y-2">
-          {recebimentos.map(r => {
+          {recFiltrados.map(r => {
             const isOpen = expandido === r.id;
             return (
               <div key={r.id} className="border border-slate-200 rounded-lg overflow-hidden">
@@ -2838,11 +2984,17 @@ function RecebimentosTab() {
               </div>
             );
           })}
-          {recebimentos.length === 0 && (
+          {recFiltrados.length === 0 && (
             <div className="py-12 text-center text-slate-400">
               <Truck size={32} className="mx-auto mb-3 text-slate-300" />
-              <p>Nenhum recebimento registrado</p>
-              <p className="text-xs mt-1">Registre a confirmação de entrega de materiais aqui</p>
+              {recebimentos.length === 0 ? (
+                <>
+                  <p>Nenhum recebimento registrado</p>
+                  <p className="text-xs mt-1">Registre a confirmação de entrega de materiais aqui</p>
+                </>
+              ) : (
+                <p>Nenhum recebimento encontrado para os filtros aplicados</p>
+              )}
             </div>
           )}
         </div>
@@ -3326,6 +3478,10 @@ function CotacoesTab() {
   const qc = useQueryClient();
   const hoje = new Date().toISOString().slice(0, 10);
 
+  // ── Estado: filtros ───────────────────────────────────────────────────────
+  const [buscaCot, setBuscaCot] = useState("");
+  const [filtroStatusCot, setFiltroStatusCot] = useState("");
+
   // ── Estado: justificativa de recusa ───────────────────────────────────────
   const [recusaModal, setRecusaModal] = useState<{ id: string; justif: string } | null>(null);
 
@@ -3382,6 +3538,16 @@ function CotacoesTab() {
     queryFn: () => cotacoesApi.comparativo(comparativoReq!.id),
     enabled: !!comparativoReq,
   });
+
+  const cotFiltradas = useMemo(() => {
+    const q = buscaCot.toLowerCase().trim();
+    return cotacoes.filter(c => {
+      const matchQ = !q || c.numero.toLowerCase().includes(q) ||
+        (c.fornecedor_nome ?? "").toLowerCase().includes(q);
+      const matchS = !filtroStatusCot || c.status === filtroStatusCot;
+      return matchQ && matchS;
+    });
+  }, [cotacoes, buscaCot, filtroStatusCot]);
 
   // ── Ouvir evento de "Registrar Cotação" vindo da tela de Requisições ──────
   useState(() => {
@@ -3652,6 +3818,33 @@ function CotacoesTab() {
         </div>
       </div>
 
+      {/* Filtros */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        <input
+          type="text"
+          placeholder="Buscar por número ou fornecedor…"
+          value={buscaCot}
+          onChange={e => setBuscaCot(e.target.value)}
+          className="flex-1 min-w-[200px] text-sm px-3 py-1.5 border border-slate-200 rounded-lg outline-none focus:border-brand-400 bg-white"
+        />
+        <select
+          value={filtroStatusCot}
+          onChange={e => setFiltroStatusCot(e.target.value)}
+          className="text-sm px-3 py-1.5 border border-slate-200 rounded-lg bg-white text-slate-600 outline-none focus:border-brand-400">
+          <option value="">Todos os status</option>
+          {Object.entries(STATUS_COT_LABELS).map(([v, l]) => (
+            <option key={v} value={v}>{l}</option>
+          ))}
+        </select>
+        {(buscaCot || filtroStatusCot) && (
+          <button
+            onClick={() => { setBuscaCot(""); setFiltroStatusCot(""); }}
+            className="text-xs text-slate-400 hover:text-slate-600 px-2 py-1.5 border border-slate-200 rounded-lg bg-white">
+            Limpar
+          </button>
+        )}
+      </div>
+
       {isLoading ? (
         <div className="text-center py-12 text-slate-400">Carregando…</div>
       ) : cotacoes.length === 0 ? (
@@ -3660,9 +3853,11 @@ function CotacoesTab() {
           <p className="font-medium">Nenhuma cotação registrada</p>
           <p className="text-xs mt-1">Após aprovar uma requisição, registre as respostas dos fornecedores.</p>
         </div>
+      ) : cotFiltradas.length === 0 ? (
+        <div className="text-center py-12 text-slate-400">Nenhuma cotação encontrada para os filtros aplicados</div>
       ) : (
         <div className="space-y-2">
-          {cotacoes.map(c => {
+          {cotFiltradas.map(c => {
             const req = requisicoes.find(r => r.id === c.requisicao_id);
             return (
               <div key={c.id}
@@ -4317,7 +4512,7 @@ export function Suprimentos() {
   ];
 
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
       <div className="mb-5">
         <h1 className="text-xl font-bold text-slate-800">Suprimentos</h1>
         <p className="text-sm text-slate-500 mt-0.5">
@@ -4373,7 +4568,7 @@ export function Suprimentos() {
         ))}
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 p-6">
+      <div className="bg-white rounded-xl border border-slate-200 p-3 sm:p-6">
         {tab === "fornecedores"   && <FornecedoresTab />}
         {tab === "requisicoes"    && <RequisicoesTab />}
         {tab === "cotacoes"       && <CotacoesTab />}

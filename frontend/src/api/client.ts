@@ -1,8 +1,9 @@
 import axios from "axios";
 
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL ?? "http://localhost:8000",
+  baseURL: import.meta.env.VITE_API_URL ?? "",
   headers: { "Content-Type": "application/json" },
+  timeout: 15_000,   // 15 segundos — nunca fica pendurado infinitamente
 });
 
 api.interceptors.request.use((config) => {
@@ -331,6 +332,80 @@ export const centroCustoApi = {
   }) => api.put(`/api/v1/obras/${obraId}/centro-custo/${codigo}`, payload).then(r => r.data),
   remover: (obraId: string, codigo: string) =>
     api.delete(`/api/v1/obras/${obraId}/centro-custo/${codigo}`),
+};
+
+// ── Tipos locais para usuários ────────────────────────────────────────────────
+export interface UsuarioResponse {
+  id: string;
+  nome: string;
+  email: string;
+  papel: string;
+  ativo: boolean;
+}
+
+export const usuariosApi = {
+  listar: (): Promise<UsuarioResponse[]> =>
+    api.get("/api/v1/usuarios").then(r => r.data),
+  criar: (data: { nome: string; email: string; senha: string; papel: string }): Promise<UsuarioResponse> =>
+    api.post("/api/v1/usuarios", data).then(r => r.data),
+  atualizar: (id: string, data: { nome?: string; papel?: string; ativo?: boolean; senha?: string }): Promise<UsuarioResponse> =>
+    api.patch(`/api/v1/usuarios/${id}`, data).then(r => r.data),
+  excluir: (id: string): Promise<void> =>
+    api.delete(`/api/v1/usuarios/${id}`).then(() => undefined),
+};
+
+export interface DocStatus {
+  doc_tipo: string;
+  status: string;
+  observacoes?: string | null;
+}
+
+export interface MatrizEmp {
+  id: string;
+  nome: string;
+  statuses: Record<string, string>;
+}
+
+export const documentosApi = {
+  listar: (empId: string): Promise<DocStatus[]> =>
+    api.get(`/api/v1/empreendimentos/${empId}/documentos`).then(r => r.data),
+  atualizar: (empId: string, docTipo: string, status: string, observacoes?: string | null): Promise<DocStatus> =>
+    api.put(`/api/v1/empreendimentos/${empId}/documentos/${docTipo}`, { status, observacoes }).then(r => r.data),
+  matriz: (): Promise<MatrizEmp[]> =>
+    api.get("/api/v1/documentos/matriz").then(r => r.data),
+};
+
+export interface TransacaoOFX {
+  fitid: string;
+  data: string;
+  valor: number;
+  nome: string;
+  memo: string;
+  tipo: "CREDIT" | "DEBIT";
+  categoria: string;
+}
+
+export interface OFXParseResult {
+  banco: string;
+  conta: string;
+  moeda: string;
+  data_inicio: string;
+  data_fim: string;
+  saldo_final: number;
+  data_saldo: string;
+  transacoes: TransacaoOFX[];
+}
+
+export const conciliacaoApi = {
+  upload: (file: File): Promise<OFXParseResult> => {
+    const form = new FormData();
+    form.append("arquivo", file);
+    return api.post("/api/v1/conciliacao/upload", form, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }).then(r => r.data);
+  },
+  finalizar: (matches: { transacao_fitid: string; lancamento_id: string }[]): Promise<{ atualizados: number }> =>
+    api.post("/api/v1/conciliacao/finalizar", { matches }).then(r => r.data),
 };
 
 export const visionApi = {

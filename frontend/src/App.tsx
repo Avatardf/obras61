@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { Header } from "@/components/layout/Header";
@@ -15,6 +16,9 @@ import { Pipeline } from "@/pages/Pipeline";
 import { Qualidade } from "@/pages/Qualidade";
 import { RDODetalhe } from "@/pages/RDODetalhe";
 import { Suprimentos } from "@/pages/Suprimentos";
+import { Conciliacao } from "@/pages/Conciliacao";
+import { Documentos } from "@/pages/Documentos";
+import { Usuarios } from "@/pages/Usuarios";
 
 const titulos: Record<string, string> = {
   "/":               "Dashboard",
@@ -26,10 +30,12 @@ const titulos: Record<string, string> = {
   "/financeiro":     "Financeiro",
   "/equipes":        "Equipes",
   "/qualidade":      "Qualidade e RDO",
-  "/documentos":     "Documentos",
+  "/documentos":     "Status Documental",
   "/vision":         "Vision 360°",
   "/analises":       "Análises IA",
   "/configuracoes":  "Configurações",
+  "/conciliacao":    "Conciliação Bancária",
+  "/usuarios":       "Gerenciar Usuários",
 };
 
 function PlaceholderPage({ path }: { path: string }) {
@@ -46,11 +52,32 @@ function PlaceholderPage({ path }: { path: string }) {
 function AppLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const titulo = titulos[location.pathname] ?? "";
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Fecha sidebar ao navegar
+  useEffect(() => { setSidebarOpen(false); }, [location.pathname]);
+
+  // Fecha sidebar ao redimensionar para desktop
+  useEffect(() => {
+    const onResize = () => { if (window.innerWidth >= 1024) setSidebarOpen(false); };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
   return (
     <div className="flex min-h-screen">
-      <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0">
-        <Header titulo={titulo} />
+      {/* Overlay escurecido (mobile) */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/60 lg:hidden backdrop-blur-sm"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <Header titulo={titulo} onMenuToggle={() => setSidebarOpen(v => !v)} />
         <main className="flex-1 overflow-auto">{children}</main>
       </div>
     </div>
@@ -137,9 +164,30 @@ export default function App() {
           </PrivatePage>
         } />
 
+        {/* Conciliação Bancária */}
+        <Route path="/conciliacao" element={
+          <PrivatePage path="/conciliacao">
+            <Conciliacao />
+          </PrivatePage>
+        } />
+
+        {/* Gerenciar Usuários (admin) */}
+        <Route path="/usuarios" element={
+          <PrivatePage path="/usuarios">
+            <Usuarios />
+          </PrivatePage>
+        } />
+
+        {/* Documentos — página real */}
+        <Route path="/documentos" element={
+          <PrivatePage path="/documentos">
+            <Documentos />
+          </PrivatePage>
+        } />
+
         {/* Módulos em desenvolvimento */}
         {["/equipes",
-          "/documentos", "/vision",
+          "/vision",
           "/analises", "/configuracoes"].map((p) => (
           <Route key={p} path={p} element={
             <PrivatePage path={p}>

@@ -122,7 +122,7 @@ export function RDODetalhe() {
   // ── Loading ──
   if (isLoading) {
     return (
-      <div className="p-6 space-y-4 animate-pulse">
+      <div className="p-4 sm:p-6 space-y-4 animate-pulse">
         <div className="h-6 bg-slate-200 rounded w-1/3" />
         <div className="h-4 bg-slate-100 rounded w-1/4" />
         <div className="grid grid-cols-3 gap-4 mt-6">
@@ -139,7 +139,7 @@ export function RDODetalhe() {
   const efetivo = rdo.efetivo_total ?? efetivoPorEquipe;
 
   return (
-    <div className="p-6 space-y-5">
+    <div className="p-4 sm:p-6 space-y-5">
 
       {/* Header */}
       <div className="flex items-start gap-4">

@@ -1,4 +1,4 @@
-import { Bell, ChevronDown, LogOut, Building2 } from "lucide-react";
+import { Bell, ChevronDown, LogOut, Building2, Menu } from "lucide-react";
 import { useState } from "react";
 import { useAuthStore } from "@/stores/authStore";
 import { useNavigate } from "react-router-dom";
@@ -11,7 +11,12 @@ function dataAtual(): string {
   return `${diasSemana[d.getDay()]}, ${d.getDate()} de ${meses[d.getMonth()]} de ${d.getFullYear()}`;
 }
 
-export function Header({ titulo }: { titulo: string }) {
+interface HeaderProps {
+  titulo: string;
+  onMenuToggle: () => void;
+}
+
+export function Header({ titulo, onMenuToggle }: HeaderProps) {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
   const [menuAberto, setMenuAberto] = useState(false);
@@ -25,7 +30,7 @@ export function Header({ titulo }: { titulo: string }) {
 
   return (
     <header
-      className="h-14 flex items-center justify-between px-6 shrink-0"
+      className="h-14 flex items-center justify-between px-3 sm:px-6 shrink-0 gap-3"
       style={{
         background: "rgba(255,255,255,0.85)",
         backdropFilter: "blur(12px)",
@@ -34,18 +39,27 @@ export function Header({ titulo }: { titulo: string }) {
         boxShadow: "0 1px 3px 0 rgba(0,0,0,0.04)",
       }}
     >
+      {/* Hamburguer — só aparece no mobile */}
+      <button
+        onClick={onMenuToggle}
+        className="lg:hidden p-2 -ml-1 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors active:scale-95 shrink-0"
+        aria-label="Abrir menu"
+      >
+        <Menu size={20} />
+      </button>
+
       {/* Título */}
-      <h1 className="text-sm font-bold text-slate-800 tracking-tight">{titulo}</h1>
+      <h1 className="text-sm font-bold text-slate-800 tracking-tight truncate flex-1">{titulo}</h1>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
 
-        {/* Data */}
-        <span className="hidden lg:block text-xs text-slate-400 font-medium tabular-nums">
+        {/* Data — só desktop */}
+        <span className="hidden xl:block text-xs text-slate-400 font-medium tabular-nums">
           {dataAtual()}
         </span>
 
-        {/* Divider */}
-        <div className="hidden lg:block w-px h-5 bg-slate-200" />
+        {/* Divider — só desktop */}
+        <div className="hidden xl:block w-px h-5 bg-slate-200" />
 
         {/* Notificações */}
         <button className="relative p-2 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-all active:scale-95">
@@ -60,11 +74,12 @@ export function Header({ titulo }: { titulo: string }) {
         <div className="relative">
           <button
             onClick={() => setMenuAberto(v => !v)}
-            className="flex items-center gap-2 rounded-xl px-2 py-1.5 hover:bg-slate-100 transition-all active:scale-95"
+            className="flex items-center gap-2 rounded-xl px-1.5 sm:px-2 py-1.5 hover:bg-slate-100 transition-all active:scale-95"
           >
             <div className="w-7 h-7 rounded-full bg-gradient-to-br from-brand-500 to-violet-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
               {inicial}
             </div>
+            {/* Nome + cargo — só em telas maiores */}
             <div className="text-left hidden sm:block">
               <p className="text-xs font-semibold text-slate-700 leading-none">{user?.nome ?? "Usuário"}</p>
               <p className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1">
