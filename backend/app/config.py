@@ -1,8 +1,17 @@
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    @field_validator("database_url", mode="before", check_fields=False)
+    @classmethod
+    def _force_asyncpg(cls, v: str) -> str:
+        # Railway/Heroku fornecem postgresql:// — convertemos para o driver async
+        if isinstance(v, str) and v.startswith("postgresql://"):
+            return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return v
 
     # App
     app_name: str = "Obras Platform"
