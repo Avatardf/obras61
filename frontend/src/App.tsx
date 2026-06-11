@@ -19,6 +19,7 @@ import { Suprimentos } from "@/pages/Suprimentos";
 import { Conciliacao } from "@/pages/Conciliacao";
 import { Documentos } from "@/pages/Documentos";
 import { Usuarios } from "@/pages/Usuarios";
+import { Equipes } from "@/pages/Equipes";
 
 const titulos: Record<string, string> = {
   "/":               "Dashboard",
@@ -185,9 +186,15 @@ export default function App() {
           </PrivatePage>
         } />
 
+        {/* Equipes — página real */}
+        <Route path="/equipes" element={
+          <PrivatePage path="/equipes">
+            <Equipes />
+          </PrivatePage>
+        } />
+
         {/* Módulos em desenvolvimento */}
-        {["/equipes",
-          "/vision",
+        {["/vision",
           "/analises", "/configuracoes"].map((p) => (
           <Route key={p} path={p} element={
             <PrivatePage path={p}>

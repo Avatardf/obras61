@@ -408,6 +408,83 @@ export const conciliacaoApi = {
     api.post("/api/v1/conciliacao/finalizar", { matches }).then(r => r.data),
 };
 
+// ── Equipes ──────────────────────────────────────────────────────────────────
+
+export interface ColaboradorResponse {
+  id: string;
+  nome: string;
+  funcao: string;
+  tipo_vinculo: "proprio" | "terceirizado";
+  fornecedor_id: string | null;
+  equipe_id: string | null;
+  custo_diaria: number | null;
+  telefone: string | null;
+  observacoes: string | null;
+  ativo: boolean;
+}
+
+export interface ColaboradorPayload {
+  nome?: string;
+  funcao?: string;
+  tipo_vinculo?: "proprio" | "terceirizado";
+  fornecedor_id?: string | null;
+  equipe_id?: string | null;
+  custo_diaria?: number | null;
+  telefone?: string | null;
+  observacoes?: string | null;
+  ativo?: boolean;
+}
+
+export interface AlocacaoResponse {
+  id: string;
+  equipe_id: string;
+  obra_id: string;
+  obra_nome: string | null;
+  data_inicio: string;
+  data_fim: string | null;
+  observacao: string | null;
+}
+
+export interface EquipeResponse {
+  id: string;
+  nome: string;
+  lider_id: string | null;
+  descricao: string | null;
+  ativo: boolean;
+  membros: ColaboradorResponse[];
+  alocacao_atual: AlocacaoResponse | null;
+}
+
+export const equipesApi = {
+  // Colaboradores
+  listarColaboradores: (params?: { ativo?: boolean; equipe_id?: string }): Promise<ColaboradorResponse[]> =>
+    api.get("/api/v1/colaboradores", { params }).then(r => r.data),
+  criarColaborador: (data: ColaboradorPayload): Promise<ColaboradorResponse> =>
+    api.post("/api/v1/colaboradores", data).then(r => r.data),
+  atualizarColaborador: (id: string, data: ColaboradorPayload): Promise<ColaboradorResponse> =>
+    api.patch(`/api/v1/colaboradores/${id}`, data).then(r => r.data),
+  excluirColaborador: (id: string): Promise<void> =>
+    api.delete(`/api/v1/colaboradores/${id}`).then(() => undefined),
+  // Equipes
+  listar: (params?: { ativo?: boolean }): Promise<EquipeResponse[]> =>
+    api.get("/api/v1/equipes", { params }).then(r => r.data),
+  criar: (data: { nome: string; lider_id?: string | null; descricao?: string | null }): Promise<EquipeResponse> =>
+    api.post("/api/v1/equipes", data).then(r => r.data),
+  atualizar: (id: string, data: { nome?: string; lider_id?: string | null; descricao?: string | null; ativo?: boolean }): Promise<EquipeResponse> =>
+    api.patch(`/api/v1/equipes/${id}`, data).then(r => r.data),
+  excluir: (id: string): Promise<void> =>
+    api.delete(`/api/v1/equipes/${id}`).then(() => undefined),
+  // Alocações
+  listarAlocacoes: (equipeId: string): Promise<AlocacaoResponse[]> =>
+    api.get(`/api/v1/equipes/${equipeId}/alocacoes`).then(r => r.data),
+  alocar: (equipeId: string, data: { obra_id: string; data_inicio: string; data_fim?: string | null; observacao?: string | null }): Promise<AlocacaoResponse> =>
+    api.post(`/api/v1/equipes/${equipeId}/alocacoes`, data).then(r => r.data),
+  atualizarAlocacao: (id: string, data: { data_inicio?: string; data_fim?: string | null; observacao?: string | null }): Promise<AlocacaoResponse> =>
+    api.patch(`/api/v1/alocacoes/${id}`, data).then(r => r.data),
+  excluirAlocacao: (id: string): Promise<void> =>
+    api.delete(`/api/v1/alocacoes/${id}`).then(() => undefined),
+};
+
 export const visionApi = {
   pontos: (obraId: string) => api.get(`/api/v1/vision/pontos/${obraId}`).then(r => r.data),
   uploadCaptura: (pontoId: string, arquivo: File) => {
