@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { Header } from "@/components/layout/Header";
+import { MobileNav } from "@/components/layout/MobileNav";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { CronogramaGantt } from "@/pages/CronogramaGantt";
 import { Dashboard } from "@/pages/Dashboard";
@@ -79,8 +80,12 @@ function AppLayout({ children }: { children: React.ReactNode }) {
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Header titulo={titulo} onMenuToggle={() => setSidebarOpen(v => !v)} />
-        <main className="flex-1 overflow-auto">{children}</main>
+        {/* pb-20 no mobile: espaço para a bottom nav não cobrir o conteúdo */}
+        <main className="flex-1 overflow-auto pb-20 lg:pb-0">{children}</main>
       </div>
+
+      {/* Navegação inferior — só mobile */}
+      <MobileNav />
     </div>
   );
 }

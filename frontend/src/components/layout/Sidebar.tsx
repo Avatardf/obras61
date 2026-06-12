@@ -13,7 +13,7 @@ const LOGO_AMARELO = "/logo/logo-amarelo.png";
 
 // ── Grupos de navegação ────────────────────────────────────────────────────────
 
-const navGroups = [
+export const navGroups = [
   {
     label: "Gestão",
     items: [
