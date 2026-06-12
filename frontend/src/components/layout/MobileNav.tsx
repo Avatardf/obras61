@@ -9,10 +9,11 @@ import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, Building2, CheckSquare, ShoppingCart,
-  MoreHorizontal, X, LogOut, UserCog, Settings,
+  MoreHorizontal, X, LogOut, UserCog, Settings, Download,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { useAuthStore } from "@/stores/authStore";
+import { usePwaInstall } from "@/hooks/usePwaInstall";
 import { podAcessar, type Papel } from "@/lib/permissoes";
 import { navGroups } from "@/components/layout/Sidebar";
 
@@ -26,6 +27,7 @@ const ATALHOS = [
 
 export function MobileNav() {
   const { user, logout } = useAuthStore();
+  const { disponivel: pwaDisponivel, instalar: instalarPwa } = usePwaInstall();
   const navigate = useNavigate();
   const [sheetAberto, setSheetAberto] = useState(false);
   const papel = user?.papel as Papel | undefined;
@@ -110,6 +112,15 @@ export function MobileNav() {
 
               {/* Admin + sair */}
               <div className="pt-3 border-t border-slate-100 space-y-1">
+                {pwaDisponivel && (
+                  <button
+                    onClick={() => { setSheetAberto(false); instalarPwa(); }}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100"
+                  >
+                    <Download size={16} className="text-emerald-600" />
+                    Instalar aplicativo
+                  </button>
+                )}
                 {isAdmin && (
                   <NavLink
                     to="/usuarios"

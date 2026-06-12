@@ -1,0 +1,32 @@
+{
+  "name": "61 Brasil — Gestão de Obras",
+  "short_name": "61 Brasil",
+  "description": "Plataforma de gestão inteligente de obras da 61 Brasil Construtora & Incorporadora",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#0d532e",
+  "background_color": "#0d532e",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "/pwa-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

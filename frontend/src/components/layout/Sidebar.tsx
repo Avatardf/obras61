@@ -3,10 +3,11 @@ import {
   LayoutDashboard, Building2, ClipboardList, ShoppingCart,
   Users, CheckSquare, FileText, Camera, BarChart3, Settings,
   Banknote, GitMerge, CalendarRange, LogOut, Zap, X, UserCog,
-  ScanLine,
+  ScanLine, Download,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { useAuthStore } from "@/stores/authStore";
+import { usePwaInstall } from "@/hooks/usePwaInstall";
 import { podAcessar, PAPEL_LABELS, PAPEL_CORES, type Papel } from "@/lib/permissoes";
 
 const LOGO_AMARELO = "/logo/logo-amarelo.png";
@@ -102,6 +103,7 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { user, logout } = useAuthStore();
+  const { disponivel: pwaDisponivel, instalar: instalarPwa } = usePwaInstall();
   const navigate = useNavigate();
   const inicial = (user?.nome ?? "U")[0].toUpperCase();
   const papel = user?.papel as Papel | undefined;
@@ -192,6 +194,17 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
       {/* ── Rodapé ──────────────────────────────────────────────────────── */}
       <div className="px-3 pb-4 pt-2 space-y-0.5" style={{ borderTop: "1px solid rgba(255,255,255,.06)" }}>
+        {/* Instalar app (PWA) — aparece quando o navegador permite (Android/Chrome) */}
+        {pwaDisponivel && (
+          <button
+            onClick={instalarPwa}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 transition-all"
+          >
+            <Download size={15} className="text-emerald-400" />
+            <span>Instalar aplicativo</span>
+          </button>
+        )}
+
         {/* Gerenciar Usuários — exclusivo para admin */}
         {isAdmin && (
           <NavLink
