@@ -394,6 +394,18 @@ export interface EmpreendimentoProgresso {
   total_obras: number;
 }
 
+export interface ComercialResumo {
+  total_unidades: number;
+  unidades_vendidas: number;
+  unidades_disponiveis: number;
+  unidades_reservadas: number;
+  vgv_estoque: number;
+  vgv_vendido: number;
+  percentual_vendido: number;
+  leads_ativos: number;
+  pipeline_valor: number;
+}
+
 export interface DashboardStats {
   total_empreendimentos: number;
   obras_ativas: number;
@@ -402,6 +414,7 @@ export interface DashboardStats {
   vgv_total: number;
   obras_recentes: ObraResumoDashboard[];
   empreendimentos_progresso: EmpreendimentoProgresso[];
+  comercial: ComercialResumo;
 }
 
 // ── Suprimentos ────────────────────────────────────────────────────────────────

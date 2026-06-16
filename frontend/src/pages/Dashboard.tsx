@@ -5,7 +5,7 @@ import {
 } from "recharts";
 import {
   AlertTriangle, Building2, CheckCircle2, ServerOff, TrendingDown, TrendingUp,
-  BarChart2, Layers, Zap,
+  BarChart2, Layers, Zap, Home, Trophy, Filter,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { clsx } from "clsx";
@@ -217,6 +217,56 @@ export function Dashboard() {
           subColor="text-gold-600"
         />
       </div>
+
+      {/* ── Desempenho Comercial (espelho + funil) ──────────────────────────── */}
+      {stats.comercial.total_unidades > 0 && (
+        <div className="card p-5">
+          <SectionTitle icon={Trophy} title="Desempenho comercial" />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mt-1">
+            {/* VGV vendido + barra de % */}
+            <div className="lg:col-span-1">
+              <div className="flex items-end justify-between mb-1.5">
+                <div>
+                  <p className="text-xs text-slate-400">VGV vendido</p>
+                  <p className="text-xl font-bold text-emerald-700 tabular-nums">{formatVGV(stats.comercial.vgv_vendido)}</p>
+                </div>
+                <p className="text-2xl font-bold text-emerald-600">{stats.comercial.percentual_vendido}%</p>
+              </div>
+              <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full transition-all"
+                  style={{ width: `${Math.min(stats.comercial.percentual_vendido, 100)}%` }} />
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">de {formatVGV(stats.comercial.vgv_estoque)} em estoque (VGV tabela)</p>
+            </div>
+
+            {/* Unidades por status */}
+            <div className="grid grid-cols-4 gap-2 lg:col-span-1">
+              {[
+                { label: "Total", valor: stats.comercial.total_unidades, cor: "text-slate-700", icon: Home },
+                { label: "Vendidas", valor: stats.comercial.unidades_vendidas, cor: "text-blue-600", icon: Trophy },
+                { label: "Reservadas", valor: stats.comercial.unidades_reservadas, cor: "text-orange-500", icon: Layers },
+                { label: "Disponíveis", valor: stats.comercial.unidades_disponiveis, cor: "text-emerald-600", icon: Home },
+              ].map(k => (
+                <div key={k.label} className="text-center bg-slate-50 rounded-xl py-3">
+                  <p className={clsx("text-xl font-bold tabular-nums", k.cor)}>{k.valor}</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">{k.label}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Funil */}
+            <button onClick={() => navigate("/funil")}
+              className="lg:col-span-1 flex items-center justify-between bg-rose-50 rounded-xl px-4 py-3 hover:bg-rose-100 transition-colors text-left">
+              <div>
+                <p className="text-xs text-rose-500 flex items-center gap-1"><Filter size={11} /> Pipeline de vendas</p>
+                <p className="text-xl font-bold text-rose-700 tabular-nums">{formatVGV(stats.comercial.pipeline_valor)}</p>
+                <p className="text-[11px] text-rose-400 mt-0.5">{stats.comercial.leads_ativos} leads ativos</p>
+              </div>
+              <TrendingUp size={28} className="text-rose-300" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Gráfico + Resumo ─────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">

@@ -161,13 +161,21 @@ async def resumo_financeiro(
         float(l.valor) for l in lancamentos
         if l.tipo == TipoLancamento.despesa and l.status != StatusLancamento.cancelado
     )
+    # Atraso é detectado pela data, não só pelo status manual: uma despesa
+    # "previsto" com vencimento no passado conta como em atraso (e sai de "a vencer").
+    hoje = _date.today()
+
+    def _em_aberto(l) -> bool:
+        return (l.tipo == TipoLancamento.despesa
+                and l.status in (StatusLancamento.previsto, StatusLancamento.atrasado))
+
     a_vencer = sum(
         float(l.valor) for l in lancamentos
-        if l.tipo == TipoLancamento.despesa and l.status == StatusLancamento.previsto
+        if _em_aberto(l) and l.data_vencimento >= hoje and l.status != StatusLancamento.atrasado
     )
     em_atraso = sum(
         float(l.valor) for l in lancamentos
-        if l.tipo == TipoLancamento.despesa and l.status == StatusLancamento.atrasado
+        if _em_aberto(l) and (l.status == StatusLancamento.atrasado or l.data_vencimento < hoje)
     )
 
     return ResumoFinanceiro(
@@ -199,7 +207,10 @@ async def fluxo_caixa(
 
     meses: dict[str, dict] = defaultdict(lambda: {"receitas": 0.0, "despesas": 0.0})
     for l in lancamentos:
-        mes = str(l.data_vencimento)[:7]  # "YYYY-MM"
+        # Regime de caixa: pagos entram no mês do pagamento; previstos, no mês
+        # do vencimento (projeção). Reflete melhor o caixa real da obra.
+        data_base = l.data_pagamento if (l.status == StatusLancamento.pago and l.data_pagamento) else l.data_vencimento
+        mes = str(data_base)[:7]  # "YYYY-MM"
         if l.tipo == TipoLancamento.receita:
             meses[mes]["receitas"] += float(l.valor)
         else:

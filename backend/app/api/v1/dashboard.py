@@ -11,6 +11,8 @@ from app.database import get_db
 from app.dependencies import CurrentUser
 from app.models.obra import Empreendimento, Etapa, Obra, StatusObra
 from app.models.orcamento import CustoRealizado, ItemOrcamento, Orcamento
+from app.models.unidade import StatusUnidade, Unidade
+from app.models.lead import EtapaFunil, Lead
 
 router = APIRouter(tags=["dashboard"])
 DB = Annotated[AsyncSession, Depends(get_db)]
@@ -33,6 +35,18 @@ class EmpreendimentoProgresso(BaseModel):
     total_obras: int
 
 
+class ComercialResumo(BaseModel):
+    total_unidades: int
+    unidades_vendidas: int
+    unidades_disponiveis: int
+    unidades_reservadas: int
+    vgv_estoque: float          # VGV de tabela de todas as unidades
+    vgv_vendido: float          # soma das vendas (unidades vendidas)
+    percentual_vendido: float   # % do VGV vendido sobre o de tabela
+    leads_ativos: int           # leads fora de "contrato"/"perdido"
+    pipeline_valor: float       # valor em negociação (leads abertos)
+
+
 class DashboardStats(BaseModel):
     total_empreendimentos: int
     obras_ativas: int
@@ -41,18 +55,20 @@ class DashboardStats(BaseModel):
     vgv_total: float
     obras_recentes: list[ObraResumoDashboard]
     empreendimentos_progresso: list[EmpreendimentoProgresso]
+    comercial: ComercialResumo
 
 
 # ── Helpers de progresso (replicados aqui para evitar import circular) ─────────
 
 def _prog_etapa(etapa: Etapa) -> float:
-    if not etapa.atividades:
-        return 0.0
-    total_prev = sum(float(a.quantidade_prevista) for a in etapa.atividades)
-    if total_prev == 0:
-        return 0.0
-    total_real = sum(float(a.quantidade_realizada) for a in etapa.atividades)
-    return min(total_real / total_prev * 100, 100.0)
+    # Usa atividades quando existirem; senão cai para percentual_realizado
+    # (mesma regra de obras.py — mantém Dashboard e Detalhe consistentes).
+    if etapa.atividades:
+        total_prev = sum(float(a.quantidade_prevista) for a in etapa.atividades)
+        if total_prev > 0:
+            total_real = sum(float(a.quantidade_realizada) for a in etapa.atividades)
+            return min(total_real / total_prev * 100, 100.0)
+    return float(etapa.percentual_realizado or 0)
 
 
 def _prog_obra(etapas: list) -> float:
@@ -80,6 +96,41 @@ async def resumo_dashboard(db: DB, current_user: CurrentUser):
     vgv_total = sum(float(e.vgv_previsto or 0) for e in empreendimentos)
     emp_map = {e.id: e.nome for e in empreendimentos}
 
+    # ── Resumo comercial (espelho digital + funil de vendas) ───────────────────
+    comercial = ComercialResumo(
+        total_unidades=0, unidades_vendidas=0, unidades_disponiveis=0,
+        unidades_reservadas=0, vgv_estoque=0.0, vgv_vendido=0.0,
+        percentual_vendido=0.0, leads_ativos=0, pipeline_valor=0.0,
+    )
+    if emp_ids:
+        unidades = (await db.execute(
+            select(Unidade).where(Unidade.tenant_id == current_user.tenant_id)
+        )).scalars().all()
+        for u in unidades:
+            comercial.total_unidades += 1
+            comercial.vgv_estoque += float(u.preco_tabela or 0)
+            if u.status == StatusUnidade.vendido:
+                comercial.unidades_vendidas += 1
+                comercial.vgv_vendido += float(u.valor_venda or u.preco_tabela or 0)
+            elif u.status == StatusUnidade.disponivel:
+                comercial.unidades_disponiveis += 1
+            elif u.status in (StatusUnidade.reservado, StatusUnidade.pre_reserva):
+                comercial.unidades_reservadas += 1
+        if comercial.vgv_estoque > 0:
+            comercial.percentual_vendido = round(comercial.vgv_vendido / comercial.vgv_estoque * 100, 1)
+
+        leads = (await db.execute(
+            select(Lead).where(
+                Lead.tenant_id == current_user.tenant_id,
+                Lead.etapa.notin_([EtapaFunil.contrato, EtapaFunil.perdido]),
+            )
+        )).scalars().all()
+        comercial.leads_ativos = len(leads)
+        comercial.pipeline_valor = round(sum(float(l.valor or 0) for l in leads), 2)
+
+    comercial.vgv_estoque = round(comercial.vgv_estoque, 2)
+    comercial.vgv_vendido = round(comercial.vgv_vendido, 2)
+
     # Resposta vazia reutilizável
     def _empty_resp(obras_recentes=None, emp_prog=None) -> DashboardStats:
         return DashboardStats(
@@ -94,6 +145,7 @@ async def resumo_dashboard(db: DB, current_user: CurrentUser):
                 )
                 for e in empreendimentos
             ],
+            comercial=comercial,
         )
 
     if not emp_ids:
@@ -189,4 +241,5 @@ async def resumo_dashboard(db: DB, current_user: CurrentUser):
         vgv_total=round(vgv_total, 2),
         obras_recentes=obras_resumo,
         empreendimentos_progresso=emp_progresso,
+        comercial=comercial,
     )

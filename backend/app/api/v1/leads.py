@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.dependencies import CurrentUser
 from app.models.lead import EtapaFunil, Lead
+from app.models.obra import Empreendimento
 from app.models.unidade import StatusUnidade, Unidade
 
 router = APIRouter(prefix="/leads", tags=["funil de vendas"])
@@ -93,10 +94,13 @@ class FunilResponse(BaseModel):
 async def _montar_response(db: AsyncSession, lead: Lead) -> LeadResponse:
     resp = LeadResponse.model_validate(lead)
     resp.dias_na_etapa = (date.today() - lead.data_entrada_etapa).days
-    if lead.empreendimento_id and lead.empreendimento:
-        resp.empreendimento_nome = lead.empreendimento.nome
-    if lead.unidade_id and lead.unidade:
-        resp.unidade_label = f"{lead.unidade.grupo} · {lead.unidade.identificador}"
+    # Busca explícita (db.get) — evita lazy-load de relationship em contexto async
+    if lead.empreendimento_id:
+        emp = await db.get(Empreendimento, lead.empreendimento_id)
+        resp.empreendimento_nome = emp.nome if emp else None
+    if lead.unidade_id:
+        un = await db.get(Unidade, lead.unidade_id)
+        resp.unidade_label = f"{un.grupo} · {un.identificador}" if un else None
     return resp
 
 
@@ -171,24 +175,40 @@ async def criar_lead(body: LeadCreate, db: AsyncSession = DB, user: CurrentUser 
 @router.patch("/{lid}", response_model=LeadResponse)
 async def atualizar_lead(lid: uuid.UUID, body: LeadUpdate, db: AsyncSession = DB, user: CurrentUser = None):
     lead = await _carregar(db, lid, user.tenant_id)
+    etapa_anterior = lead.etapa
     dados = body.model_dump(exclude_unset=True)
 
     # Mudança de etapa zera o contador de dias
     nova_etapa = dados.get("etapa")
-    if nova_etapa and nova_etapa != lead.etapa:
+    mudou_etapa = nova_etapa is not None and nova_etapa != etapa_anterior
+    if mudou_etapa:
         lead.data_entrada_etapa = date.today()
 
     for campo, valor in dados.items():
         setattr(lead, campo, valor)
 
-    # Ao fechar (contrato) com unidade vinculada → marca unidade como vendida
-    if nova_etapa == EtapaFunil.contrato and lead.unidade_id:
+    # ── Sincronização com o espelho digital ───────────────────────────────────
+    if mudou_etapa and lead.unidade_id:
         unidade = await db.get(Unidade, lead.unidade_id)
         if unidade and unidade.tenant_id == user.tenant_id:
-            unidade.status = StatusUnidade.vendido
-            unidade.cliente_nome = lead.nome_cliente
-            unidade.valor_venda = lead.valor or unidade.preco_tabela
-            unidade.data_venda = date.today()
+            # Entrando em "contrato" → vende a unidade (com trava de venda dupla)
+            if nova_etapa == EtapaFunil.contrato:
+                if unidade.status == StatusUnidade.vendido and unidade.cliente_nome != lead.nome_cliente:
+                    raise HTTPException(
+                        status.HTTP_409_CONFLICT,
+                        f"A unidade {unidade.grupo} · {unidade.identificador} já está vendida para outro cliente.",
+                    )
+                unidade.status = StatusUnidade.vendido
+                unidade.cliente_nome = lead.nome_cliente
+                unidade.valor_venda = lead.valor or unidade.preco_tabela
+                unidade.data_venda = date.today()
+            # Saindo de "contrato" (distrato/recuo) → devolve a unidade ao estoque
+            elif etapa_anterior == EtapaFunil.contrato and unidade.cliente_nome == lead.nome_cliente:
+                unidade.status = (StatusUnidade.indisponivel if nova_etapa == EtapaFunil.perdido
+                                  else StatusUnidade.reservado)
+                unidade.cliente_nome = None
+                unidade.valor_venda = None
+                unidade.data_venda = None
 
     await db.commit()
     await db.refresh(lead)

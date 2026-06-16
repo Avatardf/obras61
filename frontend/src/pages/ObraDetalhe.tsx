@@ -88,6 +88,18 @@ function OrcamentosTab({ obraId }: { obraId: string }) {
         </button>
       </div>
 
+      {/* Aviso: há orçamentos mas nenhum vigente → CPI/SPI não calculam */}
+      {orcamentos.length > 0 && !orcamentos.some(o => o.status === "vigente") && (
+        <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
+          <span className="text-base leading-none">⚠️</span>
+          <p>
+            Nenhum orçamento está <strong>vigente</strong>. O CPI/SPI e o alerta de custo do
+            Dashboard só são calculados a partir do orçamento vigente — abra um orçamento e marque-o
+            como vigente.
+          </p>
+        </div>
+      )}
+
       {orcamentos.length === 0 ? (
         <div className="bg-white rounded-xl border border-slate-200 p-10 text-center text-slate-400">
           <DollarSign size={36} className="mx-auto mb-3 opacity-25" />
