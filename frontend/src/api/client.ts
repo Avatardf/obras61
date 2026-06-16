@@ -485,6 +485,54 @@ export const equipesApi = {
     api.delete(`/api/v1/alocacoes/${id}`).then(() => undefined),
 };
 
+// ── Unidades / Espelho Digital ───────────────────────────────────────────────
+
+export type StatusUnidade =
+  | "disponivel" | "pre_reserva" | "reservado" | "vendido" | "permuta" | "indisponivel";
+
+export interface Unidade {
+  id: string;
+  empreendimento_id: string;
+  grupo: string;
+  identificador: string;
+  tipo: string | null;
+  pavimento: number | null;
+  area_privativa_m2: number | null;
+  area_total_m2: number | null;
+  fracao_ideal: number | null;
+  preco_tabela: number | null;
+  status: StatusUnidade;
+  cliente_nome: string | null;
+  valor_venda: number | null;
+  data_venda: string | null;
+  observacao: string | null;
+}
+
+export interface ResumoEspelho {
+  total: number;
+  por_status: Record<StatusUnidade, number>;
+  vgv_tabela: number;
+  vgv_vendido: number;
+}
+
+export const unidadesApi = {
+  listar: (empId: string): Promise<Unidade[]> =>
+    api.get(`/api/v1/empreendimentos/${empId}/unidades`).then(r => r.data),
+  resumo: (empId: string): Promise<ResumoEspelho> =>
+    api.get(`/api/v1/empreendimentos/${empId}/unidades/resumo`).then(r => r.data),
+  criar: (empId: string, data: Partial<Unidade>): Promise<Unidade> =>
+    api.post(`/api/v1/empreendimentos/${empId}/unidades`, data).then(r => r.data),
+  gerar: (empId: string, data: {
+    grupo: string; tipo?: string | null; quantidade: number;
+    inicio?: number; prefixo?: string; area_privativa_m2?: number | null; preco_tabela?: number | null;
+  }): Promise<Unidade[]> =>
+    api.post(`/api/v1/empreendimentos/${empId}/unidades/gerar`, data).then(r => r.data),
+  atualizar: (id: string, data: Partial<Unidade>): Promise<Unidade> =>
+    api.patch(`/api/v1/unidades/${id}`, data).then(r => r.data),
+  excluir: (id: string): Promise<void> =>
+    api.delete(`/api/v1/unidades/${id}`).then(() => undefined),
+};
+
 export const visionApi = {
   pontos: (obraId: string) => api.get(`/api/v1/vision/pontos/${obraId}`).then(r => r.data),
   uploadCaptura: (pontoId: string, arquivo: File) => {

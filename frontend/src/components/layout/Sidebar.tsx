@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Building2, ClipboardList, ShoppingCart,
   Users, CheckSquare, FileText, Camera, BarChart3, Settings,
   Banknote, GitMerge, CalendarRange, LogOut, Zap, X, UserCog,
-  ScanLine, Download,
+  ScanLine, Download, LayoutGrid,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { useAuthStore } from "@/stores/authStore";
@@ -30,6 +30,12 @@ export const navGroups = [
       { to: "/orcamentos",  icon: ClipboardList, label: "Orçamentos",      color: "text-emerald-400", bg: "bg-emerald-400/15" },
       { to: "/suprimentos", icon: ShoppingCart,  label: "Suprimentos",     color: "text-blue-400",    bg: "bg-blue-400/15"    },
       { to: "/qualidade",   icon: CheckSquare,   label: "Qualidade / RDO", color: "text-yellow-400",  bg: "bg-yellow-400/15"  },
+    ],
+  },
+  {
+    label: "Comercial",
+    items: [
+      { to: "/espelho", icon: LayoutGrid, label: "Espelho Digital", color: "text-pink-400", bg: "bg-pink-400/15" },
     ],
   },
   {

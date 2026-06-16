@@ -14,6 +14,7 @@ from app.models.financeiro import LancamentoFinanceiro
 from app.models.centro_custo import CCCategoria, CCItemCatalogo, CCLancamentoObra
 from app.models.documentos import DocumentoStatus
 from app.models.equipe import Colaborador, Equipe, EquipeAlocacao, TipoVinculo
+from app.models.unidade import Unidade, StatusUnidade
 
 __all__ = [
     "Tenant", "User",
@@ -30,4 +31,5 @@ __all__ = [
     "CCCategoria", "CCItemCatalogo", "CCLancamentoObra",
     "DocumentoStatus",
     "Colaborador", "Equipe", "EquipeAlocacao", "TipoVinculo",
+    "Unidade", "StatusUnidade",
 ]

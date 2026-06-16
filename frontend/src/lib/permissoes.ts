@@ -16,6 +16,7 @@ export type Papel = "admin" | "engenheiro" | "mestre" | "comprador" | "financeir
 export const PERMISSOES: Record<string, Papel[]> = {
   "/":               ["admin","engenheiro","mestre","comprador","financeiro","viewer"],
   "/empreendimentos":["admin","engenheiro","mestre","financeiro","viewer"],
+  "/espelho":        ["admin","engenheiro","financeiro","viewer"],
   "/obras":          ["admin","engenheiro","mestre","comprador","financeiro","viewer"],
   "/pipeline":       ["admin","engenheiro","viewer"],
   "/cronograma":     ["admin","engenheiro","mestre","viewer"],

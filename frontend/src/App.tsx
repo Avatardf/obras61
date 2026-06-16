@@ -21,6 +21,7 @@ import { Conciliacao } from "@/pages/Conciliacao";
 import { Documentos } from "@/pages/Documentos";
 import { Usuarios } from "@/pages/Usuarios";
 import { Equipes } from "@/pages/Equipes";
+import { EspelhoDigital } from "@/pages/EspelhoDigital";
 
 const titulos: Record<string, string> = {
   "/":               "Dashboard",
@@ -31,6 +32,7 @@ const titulos: Record<string, string> = {
   "/suprimentos":    "Suprimentos",
   "/financeiro":     "Financeiro",
   "/equipes":        "Equipes",
+  "/espelho":        "Espelho Digital",
   "/qualidade":      "Qualidade e RDO",
   "/documentos":     "Status Documental",
   "/vision":         "Vision 360°",
@@ -195,6 +197,13 @@ export default function App() {
         <Route path="/equipes" element={
           <PrivatePage path="/equipes">
             <Equipes />
+          </PrivatePage>
+        } />
+
+        {/* Espelho Digital — comercial */}
+        <Route path="/espelho" element={
+          <PrivatePage path="/espelho">
+            <EspelhoDigital />
           </PrivatePage>
         } />
 
