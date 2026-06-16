@@ -8,6 +8,63 @@ const LOGO_AMARELO = "/logo/logo-amarelo.png";
 
 type Aba = "login" | "registrar";
 
+const PERFIS_DEMO = [
+  {
+    papel: "admin",
+    label: "Administrador",
+    email: "admin@demo.com.br",
+    descricao: "Acesso total: usuários, configs e todos os módulos",
+    cor: "bg-purple-50 border-purple-200 hover:border-purple-400",
+    badge: "bg-purple-100 text-purple-700",
+    icone: "👑",
+  },
+  {
+    papel: "engenheiro",
+    label: "Engenheiro",
+    email: "engenheiro@demo.com.br",
+    descricao: "Obras, orçamentos, EVM e cronograma",
+    cor: "bg-blue-50 border-blue-200 hover:border-blue-400",
+    badge: "bg-blue-100 text-blue-700",
+    icone: "🏗️",
+  },
+  {
+    papel: "mestre",
+    label: "Mestre de Obras",
+    email: "mestre@demo.com.br",
+    descricao: "RDO, avanço de etapas e ocorrências de campo",
+    cor: "bg-orange-50 border-orange-200 hover:border-orange-400",
+    badge: "bg-orange-100 text-orange-700",
+    icone: "🦺",
+  },
+  {
+    papel: "comprador",
+    label: "Comprador",
+    email: "comprador@demo.com.br",
+    descricao: "Requisições, cotações e aprovação de materiais",
+    cor: "bg-green-50 border-green-200 hover:border-green-400",
+    badge: "bg-green-100 text-green-700",
+    icone: "🛒",
+  },
+  {
+    papel: "financeiro",
+    label: "Financeiro",
+    email: "financeiro@demo.com.br",
+    descricao: "Centro de custo, conciliação bancária e relatórios",
+    cor: "bg-emerald-50 border-emerald-200 hover:border-emerald-400",
+    badge: "bg-emerald-100 text-emerald-700",
+    icone: "💰",
+  },
+  {
+    papel: "viewer",
+    label: "Visitante",
+    email: "viewer@demo.com.br",
+    descricao: "Somente visualização, sem permissão de edição",
+    cor: "bg-slate-50 border-slate-200 hover:border-slate-400",
+    badge: "bg-slate-100 text-slate-600",
+    icone: "👁️",
+  },
+];
+
 export function Login() {
   const navigate = useNavigate();
   const { setAuth } = useAuthStore();
@@ -15,6 +72,7 @@ export function Login() {
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState("");
+  const [mostrarPerfis, setMostrarPerfis] = useState(false);
 
   // campos login
   const [email, setEmail] = useState("");
@@ -65,6 +123,29 @@ export function Login() {
       navigate("/");
     } catch (err: any) {
       setErro(err?.response?.data?.detail ?? "Erro ao criar conta");
+    } finally {
+      setCarregando(false);
+    }
+  }
+
+  async function loginDemo(demoEmail: string) {
+    setErro("");
+    setCarregando(true);
+    setEmail(demoEmail);
+    setSenha("demo1234");
+    try {
+      const data = await authApi.login(demoEmail, "demo1234");
+      setAuth(data.access_token, {
+        id: data.user.id,
+        nome: data.user.nome,
+        email: data.user.email,
+        papel: data.user.papel,
+        tenantId: data.user.tenant_id,
+        tenantNome: data.user.tenant_nome,
+      });
+      navigate("/");
+    } catch (err: any) {
+      setErro(err?.response?.data?.detail ?? "Erro ao conectar ao servidor");
     } finally {
       setCarregando(false);
     }
@@ -167,16 +248,49 @@ export function Login() {
                   {carregando ? "Entrando…" : "Entrar"}
                 </button>
 
-                {/* Credenciais de demonstração */}
-                <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
-                  <p className="text-xs font-medium text-slate-600 mb-1.5">🔑 Conta de demonstração</p>
+                {/* Seletor de perfis de demonstração */}
+                <div className="border border-slate-200 rounded-lg overflow-hidden">
                   <button
                     type="button"
-                    onClick={() => { setEmail("admin@demo.com.br"); setSenha("demo1234"); }}
-                    className="text-xs text-brand-600 hover:underline"
+                    onClick={() => setMostrarPerfis(v => !v)}
+                    className="w-full flex items-center justify-between px-3 py-2.5 bg-slate-50 hover:bg-slate-100 transition-colors text-left"
                   >
-                    Preencher: admin@demo.com.br / demo1234
+                    <span className="text-xs font-medium text-slate-600">
+                      🔑 Explorar perfis de demonstração
+                    </span>
+                    <span className="text-slate-400 text-xs">{mostrarPerfis ? "▲" : "▼"}</span>
                   </button>
+
+                  {mostrarPerfis && (
+                    <div className="p-3 bg-white border-t border-slate-100">
+                      <p className="text-xs text-slate-500 mb-3">
+                        Escolha um perfil para conhecer as funcionalidades e restrições de cada papel:
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {PERFIS_DEMO.map((p) => (
+                          <button
+                            key={p.papel}
+                            type="button"
+                            disabled={carregando}
+                            onClick={() => loginDemo(p.email)}
+                            className={`text-left p-2.5 rounded-lg border-2 transition-all disabled:opacity-50 ${p.cor}`}
+                          >
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <span className="text-base leading-none">{p.icone}</span>
+                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${p.badge}`}>
+                                {p.papel}
+                              </span>
+                            </div>
+                            <p className="text-xs font-semibold text-slate-700 leading-tight">{p.label}</p>
+                            <p className="text-[10px] text-slate-500 leading-tight mt-0.5">{p.descricao}</p>
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-2.5 text-center">
+                        Todos os perfis usam a senha <code className="font-mono">demo1234</code>
+                      </p>
+                    </div>
+                  )}
                 </div>
               </form>
             )}

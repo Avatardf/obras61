@@ -37,16 +37,24 @@ def seed() -> None:
             db.add(tenant)
             await db.flush()
 
-            # Usuário admin
-            admin = User(
-                id=uuid.uuid4(),
-                tenant_id=tenant.id,
-                nome="Admin Demo",
-                email="admin@demo.com.br",
-                senha_hash=hash_password("demo1234"),
-                papel=Papel.admin,
-            )
-            db.add(admin)
+            # Usuários demo — um por papel
+            usuarios_demo = [
+                ("Admin Demo",       "admin@demo.com.br",      Papel.admin),
+                ("Engenheiro Demo",  "engenheiro@demo.com.br", Papel.engenheiro),
+                ("Mestre Demo",      "mestre@demo.com.br",     Papel.mestre),
+                ("Comprador Demo",   "comprador@demo.com.br",  Papel.comprador),
+                ("Financeiro Demo",  "financeiro@demo.com.br", Papel.financeiro),
+                ("Visitante Demo",   "viewer@demo.com.br",     Papel.viewer),
+            ]
+            for nome_u, email_u, papel_u in usuarios_demo:
+                db.add(User(
+                    id=uuid.uuid4(),
+                    tenant_id=tenant.id,
+                    nome=nome_u,
+                    email=email_u,
+                    senha_hash=hash_password("demo1234"),
+                    papel=papel_u,
+                ))
 
             # Empreendimento de exemplo
             emp = Empreendimento(
@@ -100,7 +108,9 @@ def seed() -> None:
             await db.commit()
             print("✓ Seed concluído.")
             print(f"  Tenant:  {tenant.nome}  (id: {tenant.id})")
-            print(f"  Login:   admin@demo.com.br  /  demo1234")
+            print("  Logins demo (senha: demo1234):")
+            for _, email_u, papel_u in usuarios_demo:
+                print(f"    {papel_u.value:<12}  {email_u}")
             print(f"  Obra:    {obra.nome}")
 
     asyncio.run(_seed())

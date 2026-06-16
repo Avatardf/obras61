@@ -76,8 +76,8 @@ export const CATALOGO: DocCategoria[] = [
     label: "Concessionárias / Órgãos",
     icon: "⚡",
     docs: [
-      { tipo: "aneel_solicitacao",        label: "ANEEL — solicitação de ligação"      },
-      { tipo: "aneel_ligacao_definitiva", label: "ANEEL — ligação definitiva"          },
+      { tipo: "aneel_solicitacao",        label: "Equatorial — solicitação de ligação" },
+      { tipo: "aneel_ligacao_definitiva", label: "Equatorial — ligação definitiva"     },
       { tipo: "saneago_agua_esgoto",      label: "Saneago — ligação de água/esgoto"   },
       { tipo: "saneago_ligacao_definitiva",label: "Saneago — ligação definitiva"       },
       { tipo: "bombeiros_ppci",           label: "Bombeiros — PPCI aprovado"           },

@@ -8,7 +8,7 @@ import {
   TrendingUp, TrendingDown, Wallet, AlertCircle, Plus, Trash2, Pencil,
   ShoppingCart, CheckCircle2, CreditCard,
 } from "lucide-react";
-import { financeiroApi } from "@/api/client";
+import { financeiroApi, suprimentosApi } from "@/api/client";
 import { Modal } from "@/components/ui/Modal";
 import { Input, Select } from "@/components/ui/Input";
 import { CurrencyInput } from "@/components/ui/CurrencyInput";
@@ -219,6 +219,11 @@ export function Financeiro() {
   const { data: fluxo = [] } = useQuery<FluxoCaixaMes[]>({
     queryKey: ["financeiro-fluxo", ano],
     queryFn: () => financeiroApi.fluxoCaixa({ ano }),
+  });
+
+  const { data: obras = [] } = useQuery({
+    queryKey: ["obras-lista"],
+    queryFn: suprimentosApi.listarObras,
   });
 
   const salvar = useMutation({
@@ -537,6 +542,12 @@ export function Financeiro() {
               )}
             </Select>
           </div>
+
+          <Select label="Obra (opcional)" value={form.obra_id ?? ""}
+            onChange={e => setForm(f => ({ ...f, obra_id: e.target.value || undefined }))}>
+            <option value="">— Não vinculado a uma obra —</option>
+            {obras.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}
+          </Select>
 
           <Input label="Descrição" required value={form.descricao}
             onChange={e => setForm(f => ({ ...f, descricao: e.target.value }))}
