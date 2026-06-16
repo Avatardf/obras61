@@ -1,9 +1,9 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { obrasApi } from "@/api/client";
 import { Input, Select } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
-import type { ObraCreate } from "@/types";
+import type { ObraCreate, ObraResponse } from "@/types";
 
 const STATUS_OBRA = [
   { value: "planejamento", label: "Planejamento" },
@@ -16,6 +16,7 @@ interface Props {
   aberto: boolean;
   onFechar: () => void;
   empreendimentoId: string;
+  obra?: ObraResponse | null;   // quando presente → modo edição
 }
 
 const vazio = (): ObraCreate => ({
@@ -23,13 +24,33 @@ const vazio = (): ObraCreate => ({
   area_construida_m2: null, numero_pavimentos: null, numero_unidades: null,
 });
 
-export function ObraForm({ aberto, onFechar, empreendimentoId }: Props) {
+export function ObraForm({ aberto, onFechar, empreendimentoId, obra }: Props) {
   const qc = useQueryClient();
+  const edicao = !!obra;
   const [form, setForm] = useState<ObraCreate>(vazio());
   const [erro, setErro] = useState("");
 
+  // Prefill ao abrir em modo edição
+  useEffect(() => {
+    if (obra) {
+      setForm({
+        nome: obra.nome,
+        status: obra.status,
+        usar_etapas_padrao: false,
+        area_construida_m2: obra.area_construida_m2 ?? null,
+        numero_pavimentos: obra.numero_pavimentos ?? null,
+        numero_unidades: obra.numero_unidades ?? null,
+      });
+    } else {
+      setForm(vazio());
+    }
+    setErro("");
+  }, [obra, aberto]);
+
   const mutation = useMutation({
-    mutationFn: () => obrasApi.criar(empreendimentoId, form),
+    mutationFn: () => edicao
+      ? obrasApi.atualizar(obra!.id, form)
+      : obrasApi.criar(empreendimentoId, form),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["obras", empreendimentoId] });
       qc.invalidateQueries({ queryKey: ["empreendimentos"] });
@@ -48,7 +69,7 @@ export function ObraForm({ aberto, onFechar, empreendimentoId }: Props) {
   }
 
   return (
-    <Modal titulo="Nova Obra" aberto={aberto} onFechar={onFechar}>
+    <Modal titulo={edicao ? "Editar Obra" : "Nova Obra"} aberto={aberto} onFechar={onFechar}>
       <form onSubmit={e => { e.preventDefault(); mutation.mutate(); }} className="p-6 space-y-5">
 
         {erro && (
@@ -92,7 +113,8 @@ export function ObraForm({ aberto, onFechar, empreendimentoId }: Props) {
           />
         </div>
 
-        {/* Etapas padrão */}
+        {/* Etapas padrão — só na criação */}
+        {!edicao && (
         <label className="flex items-start gap-3 p-4 bg-brand-50 border border-brand-200 rounded-xl cursor-pointer">
           <input
             type="checkbox"
@@ -108,6 +130,7 @@ export function ObraForm({ aberto, onFechar, empreendimentoId }: Props) {
             </p>
           </div>
         </label>
+        )}
 
         <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
           <button type="button" onClick={onFechar}

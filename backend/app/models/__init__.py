@@ -15,6 +15,7 @@ from app.models.centro_custo import CCCategoria, CCItemCatalogo, CCLancamentoObr
 from app.models.documentos import DocumentoStatus
 from app.models.equipe import Colaborador, Equipe, EquipeAlocacao, TipoVinculo
 from app.models.unidade import Unidade, StatusUnidade
+from app.models.lead import Lead, EtapaFunil
 
 __all__ = [
     "Tenant", "User",
@@ -32,4 +33,5 @@ __all__ = [
     "DocumentoStatus",
     "Colaborador", "Equipe", "EquipeAlocacao", "TipoVinculo",
     "Unidade", "StatusUnidade",
+    "Lead", "EtapaFunil",
 ]

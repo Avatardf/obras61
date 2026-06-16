@@ -533,6 +533,55 @@ export const unidadesApi = {
     api.delete(`/api/v1/unidades/${id}`).then(() => undefined),
 };
 
+// ── Funil de Vendas (CRM) ────────────────────────────────────────────────────
+
+export type EtapaFunil =
+  | "pre_atendimento" | "visita" | "atendimento" | "pasta_digital" | "proposta" | "contrato" | "perdido";
+
+export interface Lead {
+  id: string;
+  nome_cliente: string;
+  telefone: string | null;
+  email: string | null;
+  empreendimento_id: string | null;
+  empreendimento_nome: string | null;
+  unidade_id: string | null;
+  unidade_label: string | null;
+  etapa: EtapaFunil;
+  valor: number | null;
+  responsavel: string | null;
+  origem: string | null;
+  observacoes: string | null;
+  data_entrada_etapa: string;
+  dias_na_etapa: number;
+  motivo_perda: string | null;
+}
+
+export interface ColunaFunil {
+  etapa: EtapaFunil;
+  total: number;
+  valor: number;
+  leads: Lead[];
+}
+
+export interface FunilResponse {
+  colunas: ColunaFunil[];
+  total_leads: number;
+  valor_pipeline: number;
+  valor_ganho: number;
+}
+
+export const leadsApi = {
+  funil: (empreendimentoId?: string): Promise<FunilResponse> =>
+    api.get("/api/v1/leads/funil", { params: empreendimentoId ? { empreendimento_id: empreendimentoId } : {} }).then(r => r.data),
+  criar: (data: Partial<Lead>): Promise<Lead> =>
+    api.post("/api/v1/leads", data).then(r => r.data),
+  atualizar: (id: string, data: Partial<Lead>): Promise<Lead> =>
+    api.patch(`/api/v1/leads/${id}`, data).then(r => r.data),
+  excluir: (id: string): Promise<void> =>
+    api.delete(`/api/v1/leads/${id}`).then(() => undefined),
+};
+
 export const visionApi = {
   pontos: (obraId: string) => api.get(`/api/v1/vision/pontos/${obraId}`).then(r => r.data),
   uploadCaptura: (pontoId: string, arquivo: File) => {

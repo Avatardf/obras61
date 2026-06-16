@@ -1,5 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Building2, Plus, Sparkles, ClipboardList, FileText } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft, Building2, Plus, Sparkles, ClipboardList, FileText, Pencil, Trash2, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { empreendimentosApi, obrasApi } from "@/api/client";
@@ -11,11 +11,14 @@ import { Badge } from "@/components/ui/Badge";
 import type { ObraResponse, EmpreendimentoResponse } from "@/types";
 import { clsx } from "clsx";
 
-function ObraCard({ obra, onClick }: { obra: ObraResponse; onClick: () => void }) {
+function ObraCard({ obra, onClick, onEdit, onDelete }: {
+  obra: ObraResponse; onClick: () => void; onEdit: () => void; onDelete: () => void;
+}) {
+  const stop = (fn: () => void) => (e: React.MouseEvent) => { e.stopPropagation(); fn(); };
   return (
-    <button
+    <div
       onClick={onClick}
-      className="w-full bg-white rounded-xl border border-slate-200 p-5 text-left hover:shadow-md hover:border-brand-300 transition-all group"
+      className="w-full bg-white rounded-xl border border-slate-200 p-5 text-left hover:shadow-md hover:border-brand-300 transition-all group cursor-pointer"
     >
       <div className="flex items-start justify-between gap-3 mb-4">
         <div>
@@ -26,7 +29,16 @@ function ObraCard({ obra, onClick }: { obra: ObraResponse; onClick: () => void }
             <Badge value={obra.status} />
           </div>
         </div>
-        <Building2 size={20} className="text-slate-300 group-hover:text-brand-400 transition-colors shrink-0 mt-0.5" />
+        <div className="flex items-center gap-1 shrink-0">
+          <button onClick={stop(onEdit)} title="Editar obra"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-brand-600 hover:bg-brand-50 transition-colors">
+            <Pencil size={14} />
+          </button>
+          <button onClick={stop(onDelete)} title="Excluir obra"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+            <Trash2 size={14} />
+          </button>
+        </div>
       </div>
 
       {/* Progresso físico */}
@@ -58,16 +70,28 @@ function ObraCard({ obra, onClick }: { obra: ObraResponse; onClick: () => void }
           </div>
         ))}
       </div>
-    </button>
+    </div>
   );
 }
 
 export function EmpreendimentoDetalhe() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const [formAberto, setFormAberto] = useState(false);
+  const [obraEditando, setObraEditando] = useState<ObraResponse | null>(null);
+  const [obraExcluindo, setObraExcluindo] = useState<ObraResponse | null>(null);
   const [editarEmpAberto, setEditarEmpAberto] = useState(false);
   const [aba, setAba] = useState<"obras" | "estimativas" | "documentos">("obras");
+
+  const excluirObra = useMutation({
+    mutationFn: (obraId: string) => obrasApi.excluir(obraId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["obras", id] });
+      qc.invalidateQueries({ queryKey: ["empreendimentos"] });
+      setObraExcluindo(null);
+    },
+  });
 
   const { data: emp } = useQuery<EmpreendimentoResponse>({
     queryKey: ["empreendimento", id],
@@ -168,6 +192,8 @@ export function EmpreendimentoDetalhe() {
                 key={obra.id}
                 obra={obra}
                 onClick={() => navigate(`/obras/${obra.id}`)}
+                onEdit={() => setObraEditando(obra)}
+                onDelete={() => setObraExcluindo(obra)}
               />
             ))}
           </div>
@@ -201,6 +227,41 @@ export function EmpreendimentoDetalhe() {
         onFechar={() => setFormAberto(false)}
         empreendimentoId={id!}
       />
+
+      {/* Edição de obra */}
+      <ObraForm
+        aberto={!!obraEditando}
+        onFechar={() => setObraEditando(null)}
+        empreendimentoId={id!}
+        obra={obraEditando}
+      />
+
+      {/* Confirmação de exclusão de obra */}
+      {obraExcluindo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 text-center">
+            <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
+              <Trash2 size={20} className="text-red-400" />
+            </div>
+            <h2 className="text-base font-semibold text-slate-800 mb-1">Excluir obra?</h2>
+            <p className="text-sm text-slate-500 mb-5">
+              <span className="font-medium text-slate-700">{obraExcluindo.nome}</span> e todas as suas
+              etapas, orçamentos e lançamentos serão removidos permanentemente.
+            </p>
+            <div className="flex gap-2">
+              <button onClick={() => setObraExcluindo(null)}
+                className="flex-1 px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">
+                Cancelar
+              </button>
+              <button onClick={() => excluirObra.mutate(obraExcluindo.id)} disabled={excluirObra.isPending}
+                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-60 flex items-center justify-center gap-2">
+                {excluirObra.isPending && <Loader2 size={14} className="animate-spin" />}
+                Excluir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Edição do empreendimento — abre quando o usuário clica em "Editar agora"
           no banner de dados insuficientes da Estimativa IA */}
