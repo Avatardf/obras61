@@ -4,7 +4,7 @@ import { FileText, RefreshCw, ChevronDown, ChevronRight, Info } from "lucide-rea
 import clsx from "clsx";
 import { documentosApi } from "@/api/client";
 import {
-  CATALOGO, TODOS_DOCS, STATUS_CONFIG, STATUS_CICLO, calcProgresso,
+  CATALOGO, TODOS_DOCS, STATUS_CONFIG, STATUS_CICLO, RESPONSAVEIS, calcProgresso,
   type StatusDoc,
 } from "@/lib/docsCatalogo";
 import { useAuthStore } from "@/stores/authStore";
@@ -149,7 +149,20 @@ function CatRow({
             i % 2 === 0 ? "bg-white" : "bg-slate-50/30"
           )}
         >
-          <td className="px-4 py-1 text-sm text-slate-700 whitespace-nowrap">{doc.label}</td>
+          <td className="px-4 py-1 whitespace-nowrap">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-slate-700">{doc.label}</span>
+              <span className={clsx("text-[10px] font-medium px-1.5 py-0.5 rounded-full", RESPONSAVEIS[doc.responsavel].cor)}
+                title={`Responsável padrão — ${RESPONSAVEIS[doc.responsavel].papel}`}>
+                {doc.responsavel}
+              </span>
+              {doc.taxa && (
+                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-yellow-100 text-yellow-700" title="Exige taxa/emolumento">
+                  Taxa
+                </span>
+              )}
+            </div>
+          </td>
           {emps.map(emp => {
             const empStatuses = statusMap.get(emp.id) ?? {};
             const s = (empStatuses[doc.tipo] ?? "pendente") as StatusDoc;
@@ -181,7 +194,8 @@ export function Documentos() {
     queryFn: documentosApi.matriz,
   });
 
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  // Grupos começam fechados por padrão (52 documentos — abre só o que precisar)
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set(CATALOGO.map(c => c.id)));
 
   // Mapa empId → statuses
   const statusMap = useMemo(

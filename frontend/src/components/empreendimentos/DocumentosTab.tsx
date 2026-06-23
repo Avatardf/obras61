@@ -195,7 +195,7 @@ function FaseBlock({ cat, empId, statuses, obses, prazos, resps, canWrite }: {
   prazos: Record<string, string>; resps: Record<string, string>;
   canWrite: boolean;
 }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);   // fases começam fechadas
   const tipos = cat.docs.map(d => d.tipo);
   const pct = calcProgresso(statuses, tipos);
   const concluidos = tipos.filter(t => statuses[t] === "concluido").length;
