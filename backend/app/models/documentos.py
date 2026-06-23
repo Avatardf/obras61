@@ -34,6 +34,7 @@ class DocumentoStatus(Base, TenantMixin, TimestampMixin):
         Enum(StatusDoc, native_enum=False), default=StatusDoc.pendente
     )
     observacoes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    responsavel: Mapped[str | None] = mapped_column(String(40), nullable=True)  # override do catálogo
     data_inicio: Mapped[date | None] = mapped_column(DATE, nullable=True)
     data_prazo: Mapped[date | None] = mapped_column(DATE, nullable=True)
     data_conclusao: Mapped[date | None] = mapped_column(DATE, nullable=True)

@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 import { documentosApi, type DocStatus } from "@/api/client";
-import { CATALOGO, RESPONSAVEIS, calcProgresso, type StatusDoc, type DocItem } from "@/lib/docsCatalogo";
+import { CATALOGO, RESPONSAVEIS, calcProgresso, type StatusDoc, type DocItem, type Responsavel } from "@/lib/docsCatalogo";
 import { useAuthStore } from "@/stores/authStore";
 import { podeEscrever } from "@/lib/permissoes";
 
@@ -43,7 +43,9 @@ function ObsField({ value, onSave, disabled }: { value: string; onSave: (v: stri
 
 // ── Linha de documento ────────────────────────────────────────────────────────
 
-interface DocRowInitial { status: StatusDoc; obs: string; prazo: string }
+interface DocRowInitial { status: StatusDoc; obs: string; prazo: string; resp: string }
+
+const RESP_OPCOES = Object.keys(RESPONSAVEIS) as Responsavel[];
 
 function DocRow({ empId, doc, initial, canWrite }: {
   empId: string; doc: DocItem; initial: DocRowInitial; canWrite: boolean;
@@ -51,44 +53,49 @@ function DocRow({ empId, doc, initial, canWrite }: {
   const [localStatus, setLocalStatus] = useState<StatusDoc>(initial.status);
   const [localObs, setLocalObs] = useState(initial.obs);
   const [localPrazo, setLocalPrazo] = useState(initial.prazo);
+  const [localResp, setLocalResp] = useState(initial.resp);   // "" = usa padrão do catálogo
   const [obsOpen, setObsOpen] = useState(!!initial.obs);
   const [saveErr, setSaveErr] = useState(false);
 
   useEffect(() => { setLocalStatus(initial.status); }, [initial.status]);
   useEffect(() => { setLocalObs(initial.obs); }, [initial.obs]);
   useEffect(() => { setLocalPrazo(initial.prazo); }, [initial.prazo]);
+  useEffect(() => { setLocalResp(initial.resp); }, [initial.resp]);
 
   const qc = useQueryClient();
   const mut = useMutation({
-    mutationFn: (p: { s: StatusDoc; o: string; prazo: string }) =>
+    mutationFn: (p: { s: StatusDoc; o: string; prazo: string; resp: string }) =>
       documentosApi.atualizar(empId, doc.tipo, {
-        status: p.s, observacoes: p.o || null, data_prazo: p.prazo || null,
+        status: p.s, observacoes: p.o || null, data_prazo: p.prazo || null, responsavel: p.resp || null,
       }),
     onMutate: (p) => {
       qc.setQueryData<DocStatus[]>(["documentos", empId], (old = []) => {
         const ex = old.find(d => d.doc_tipo === doc.tipo);
-        const patch = { status: p.s as string, observacoes: p.o || null, data_prazo: p.prazo || null };
+        const patch = { status: p.s as string, observacoes: p.o || null, data_prazo: p.prazo || null, responsavel: p.resp || null };
         return ex
           ? old.map(d => d.doc_tipo === doc.tipo ? { ...d, ...patch } : d)
           : [...old, { doc_tipo: doc.tipo, ...patch }];
       });
       setSaveErr(false);
     },
-    onError: () => { setLocalStatus(initial.status); setLocalObs(initial.obs); setLocalPrazo(initial.prazo); setSaveErr(true); setTimeout(() => setSaveErr(false), 3000); },
+    onError: () => { setLocalStatus(initial.status); setLocalObs(initial.obs); setLocalPrazo(initial.prazo); setLocalResp(initial.resp); setSaveErr(true); setTimeout(() => setSaveErr(false), 3000); },
     onSettled: () => { qc.invalidateQueries({ queryKey: ["documentos", empId] }); qc.invalidateQueries({ queryKey: ["matriz-documentos"] }); },
   });
 
   const isUrgente = localStatus === "urgente";
   const displaySt = isUrgente ? "pendente" : localStatus;
   const vencido = !!localPrazo && localStatus !== "concluido" && localStatus !== "nao_se_aplica" && localPrazo < hoje();
-  const resp = RESPONSAVEIS[doc.responsavel];
+  // Responsável efetivo: override salvo, senão o padrão do catálogo
+  const respAtual = (localResp || doc.responsavel) as Responsavel;
+  const resp = RESPONSAVEIS[respAtual];
 
-  const salvar = (over: Partial<{ s: StatusDoc; o: string; prazo: string }> = {}) => {
+  const salvar = (over: Partial<{ s: StatusDoc; o: string; prazo: string; resp: string }> = {}) => {
     if (!canWrite) return;
-    const p = { s: localStatus, o: localObs, prazo: localPrazo, ...over };
+    const p = { s: localStatus, o: localObs, prazo: localPrazo, resp: localResp, ...over };
     if (over.s !== undefined) setLocalStatus(over.s);
     if (over.o !== undefined) setLocalObs(over.o);
     if (over.prazo !== undefined) setLocalPrazo(over.prazo);
+    if (over.resp !== undefined) setLocalResp(over.resp);
     mut.mutate(p);
   };
 
@@ -103,9 +110,23 @@ function DocRow({ empId, doc, initial, canWrite }: {
               isUrgente ? "text-amber-800 font-medium" : vencido ? "text-red-700 font-medium" : "text-slate-700")}>
               {doc.label}
             </span>
-            <span className={clsx("text-[10px] font-medium px-1.5 py-0.5 rounded-full", resp.cor)} title={resp.papel}>
-              {doc.responsavel}
-            </span>
+            {canWrite ? (
+              <span className="relative inline-flex">
+                <select
+                  value={localResp || doc.responsavel}
+                  onChange={e => salvar({ resp: e.target.value === doc.responsavel ? "" : e.target.value })}
+                  title={`Responsável — padrão: ${doc.responsavel}${resp ? " · " + resp.papel : ""}`}
+                  className={clsx("appearance-none cursor-pointer text-[10px] font-medium pl-1.5 pr-4 py-0.5 rounded-full outline-none border-0", resp.cor)}
+                >
+                  {RESP_OPCOES.map(r => <option key={r} value={r}>{r}{r === doc.responsavel ? " (padrão)" : ""}</option>)}
+                </select>
+                <ChevronDown size={9} className="absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none opacity-60" />
+              </span>
+            ) : (
+              <span className={clsx("text-[10px] font-medium px-1.5 py-0.5 rounded-full", resp.cor)} title={resp?.papel}>
+                {respAtual}
+              </span>
+            )}
             {doc.taxa && (
               <span className="inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-yellow-100 text-yellow-700" title="Exige pagamento de taxa/emolumento">
                 <Coins size={9} /> Taxa
@@ -168,9 +189,10 @@ function DocRow({ empId, doc, initial, canWrite }: {
 
 // ── Bloco de fase ─────────────────────────────────────────────────────────────
 
-function FaseBlock({ cat, empId, statuses, obses, prazos, canWrite }: {
+function FaseBlock({ cat, empId, statuses, obses, prazos, resps, canWrite }: {
   cat: typeof CATALOGO[0]; empId: string;
-  statuses: Record<string, string>; obses: Record<string, string>; prazos: Record<string, string>;
+  statuses: Record<string, string>; obses: Record<string, string>;
+  prazos: Record<string, string>; resps: Record<string, string>;
   canWrite: boolean;
 }) {
   const [open, setOpen] = useState(true);
@@ -217,7 +239,7 @@ function FaseBlock({ cat, empId, statuses, obses, prazos, canWrite }: {
         <div className="px-4">
           {cat.docs.map(doc => (
             <DocRow key={doc.tipo} empId={empId} doc={doc}
-              initial={{ status: (statuses[doc.tipo] ?? "pendente") as StatusDoc, obs: obses[doc.tipo] ?? "", prazo: prazos[doc.tipo] ?? "" }}
+              initial={{ status: (statuses[doc.tipo] ?? "pendente") as StatusDoc, obs: obses[doc.tipo] ?? "", prazo: prazos[doc.tipo] ?? "", resp: resps[doc.tipo] ?? "" }}
               canWrite={canWrite} />
           ))}
         </div>
@@ -240,10 +262,12 @@ export function DocumentosTab({ empreendimentoId }: { empreendimentoId: string }
   const statuses: Record<string, string> = {};
   const obses: Record<string, string> = {};
   const prazos: Record<string, string> = {};
+  const resps: Record<string, string> = {};
   for (const s of rawStatuses) {
     statuses[s.doc_tipo] = s.status;
     obses[s.doc_tipo] = s.observacoes ?? "";
     prazos[s.doc_tipo] = s.data_prazo ?? "";
+    resps[s.doc_tipo] = s.responsavel ?? "";
   }
 
   const allTipos = CATALOGO.flatMap(c => c.docs).map(d => d.tipo);
@@ -284,7 +308,7 @@ export function DocumentosTab({ empreendimentoId }: { empreendimentoId: string }
       {/* Fases na ordem da planilha */}
       {CATALOGO.map(cat => (
         <FaseBlock key={cat.id} cat={cat} empId={empreendimentoId}
-          statuses={statuses} obses={obses} prazos={prazos} canWrite={canWrite} />
+          statuses={statuses} obses={obses} prazos={prazos} resps={resps} canWrite={canWrite} />
       ))}
     </div>
   );

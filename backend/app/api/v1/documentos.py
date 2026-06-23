@@ -23,6 +23,7 @@ DB = Annotated[AsyncSession, Depends(get_db)]
 class DocStatusIn(BaseModel):
     status: str
     observacoes: str | None = None
+    responsavel: str | None = None
     data_inicio: date | None = None
     data_prazo: date | None = None
     data_conclusao: date | None = None
@@ -32,6 +33,7 @@ class DocStatusOut(BaseModel):
     doc_tipo: str
     status: str
     observacoes: str | None = None
+    responsavel: str | None = None
     data_inicio: date | None = None
     data_prazo: date | None = None
     data_conclusao: date | None = None
@@ -70,7 +72,7 @@ async def listar_documentos(
     rows = result.scalars().all()
     return [
         DocStatusOut(
-            doc_tipo=r.doc_tipo, status=r.status, observacoes=r.observacoes,
+            doc_tipo=r.doc_tipo, status=r.status, observacoes=r.observacoes, responsavel=r.responsavel,
             data_inicio=r.data_inicio, data_prazo=r.data_prazo, data_conclusao=r.data_conclusao,
         )
         for r in rows
@@ -110,6 +112,7 @@ async def atualizar_documento(
             doc_tipo=doc_tipo,
             status=status_val,
             observacoes=body.observacoes,
+            responsavel=body.responsavel,
             data_inicio=body.data_inicio,
             data_prazo=body.data_prazo,
             data_conclusao=data_conclusao,
@@ -119,6 +122,7 @@ async def atualizar_documento(
             set_={
                 "status": status_val,
                 "observacoes": body.observacoes,
+                "responsavel": body.responsavel,
                 "data_inicio": body.data_inicio,
                 "data_prazo": body.data_prazo,
                 "data_conclusao": data_conclusao,
@@ -128,6 +132,7 @@ async def atualizar_documento(
             DocumentoStatus.doc_tipo,
             DocumentoStatus.status,
             DocumentoStatus.observacoes,
+            DocumentoStatus.responsavel,
             DocumentoStatus.data_inicio,
             DocumentoStatus.data_prazo,
             DocumentoStatus.data_conclusao,
@@ -137,7 +142,7 @@ async def atualizar_documento(
     row = result.one()
     await db.commit()
     return DocStatusOut(
-        doc_tipo=row.doc_tipo, status=row.status, observacoes=row.observacoes,
+        doc_tipo=row.doc_tipo, status=row.status, observacoes=row.observacoes, responsavel=row.responsavel,
         data_inicio=row.data_inicio, data_prazo=row.data_prazo, data_conclusao=row.data_conclusao,
     )
 

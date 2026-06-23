@@ -85,10 +85,13 @@ def _prog_obra(etapas: list) -> float:
 async def resumo_dashboard(db: DB, current_user: CurrentUser):
     """Retorna métricas consolidadas para o Dashboard principal."""
 
-    # 1. Empreendimentos do tenant
+    # 1. Empreendimentos ativos do tenant (exclui os que estão na Lixeira)
     emp_result = await db.execute(
         select(Empreendimento)
-        .where(Empreendimento.tenant_id == current_user.tenant_id)
+        .where(
+            Empreendimento.tenant_id == current_user.tenant_id,
+            Empreendimento.deleted_at.is_(None),
+        )
         .order_by(Empreendimento.nome)
     )
     empreendimentos = emp_result.scalars().all()
@@ -104,7 +107,10 @@ async def resumo_dashboard(db: DB, current_user: CurrentUser):
     )
     if emp_ids:
         unidades = (await db.execute(
-            select(Unidade).where(Unidade.tenant_id == current_user.tenant_id)
+            select(Unidade).where(
+                Unidade.tenant_id == current_user.tenant_id,
+                Unidade.empreendimento_id.in_(emp_ids),
+            )
         )).scalars().all()
         for u in unidades:
             comercial.total_unidades += 1
@@ -123,6 +129,8 @@ async def resumo_dashboard(db: DB, current_user: CurrentUser):
             select(Lead).where(
                 Lead.tenant_id == current_user.tenant_id,
                 Lead.etapa.notin_([EtapaFunil.contrato, EtapaFunil.perdido]),
+                # leads sem empreendimento OU de empreendimento ativo
+                (Lead.empreendimento_id.is_(None)) | (Lead.empreendimento_id.in_(emp_ids)),
             )
         )).scalars().all()
         comercial.leads_ativos = len(leads)

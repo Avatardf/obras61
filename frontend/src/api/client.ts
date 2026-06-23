@@ -358,6 +358,7 @@ export interface DocStatus {
   doc_tipo: string;
   status: string;
   observacoes?: string | null;
+  responsavel?: string | null;
   data_inicio?: string | null;
   data_prazo?: string | null;
   data_conclusao?: string | null;
@@ -366,6 +367,7 @@ export interface DocStatus {
 export interface DocStatusPayload {
   status: string;
   observacoes?: string | null;
+  responsavel?: string | null;
   data_inicio?: string | null;
   data_prazo?: string | null;
   data_conclusao?: string | null;
