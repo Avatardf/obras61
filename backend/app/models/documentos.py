@@ -1,8 +1,9 @@
 """Modelo de controle de status documental por empreendimento."""
 import uuid
+from datetime import date
 from enum import StrEnum
 
-from sqlalchemy import UUID, Enum, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import DATE, UUID, Enum, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -33,6 +34,9 @@ class DocumentoStatus(Base, TenantMixin, TimestampMixin):
         Enum(StatusDoc, native_enum=False), default=StatusDoc.pendente
     )
     observacoes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    data_inicio: Mapped[date | None] = mapped_column(DATE, nullable=True)
+    data_prazo: Mapped[date | None] = mapped_column(DATE, nullable=True)
+    data_conclusao: Mapped[date | None] = mapped_column(DATE, nullable=True)
 
     __table_args__ = (
         UniqueConstraint(

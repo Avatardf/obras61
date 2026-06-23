@@ -89,7 +89,7 @@ function MatrizCell({
   const qc = useQueryClient();
 
   const mut = useMutation({
-    mutationFn: (s: StatusDoc) => documentosApi.atualizar(empId, docTipo, s),
+    mutationFn: (s: StatusDoc) => documentosApi.atualizar(empId, docTipo, { status: s }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["matriz-documentos"] }),
   });
 

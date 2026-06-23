@@ -1,5 +1,6 @@
 """API Status Documental — leitura e atualização por empreendimento."""
 import uuid
+from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -22,12 +23,18 @@ DB = Annotated[AsyncSession, Depends(get_db)]
 class DocStatusIn(BaseModel):
     status: str
     observacoes: str | None = None
+    data_inicio: date | None = None
+    data_prazo: date | None = None
+    data_conclusao: date | None = None
 
 
 class DocStatusOut(BaseModel):
     doc_tipo: str
     status: str
     observacoes: str | None = None
+    data_inicio: date | None = None
+    data_prazo: date | None = None
+    data_conclusao: date | None = None
 
 
 class MatrizEmp(BaseModel):
@@ -61,8 +68,13 @@ async def listar_documentos(
     )
     result = await db.execute(stmt)
     rows = result.scalars().all()
-    return [DocStatusOut(doc_tipo=r.doc_tipo, status=r.status, observacoes=r.observacoes)
-            for r in rows]
+    return [
+        DocStatusOut(
+            doc_tipo=r.doc_tipo, status=r.status, observacoes=r.observacoes,
+            data_inicio=r.data_inicio, data_prazo=r.data_prazo, data_conclusao=r.data_conclusao,
+        )
+        for r in rows
+    ]
 
 
 @router.put(
@@ -84,6 +96,11 @@ async def atualizar_documento(
 
     # Upsert atômico — INSERT ... ON CONFLICT DO UPDATE evita race condition
     # quando o usuário clica múltiplos documentos em sequência rápida.
+    # Conclusão automática: ao marcar "concluído" sem data, registra hoje
+    data_conclusao = body.data_conclusao
+    if status_val == StatusDoc.concluido and data_conclusao is None:
+        data_conclusao = date.today()
+
     upsert = (
         pg_insert(DocumentoStatus)
         .values(
@@ -93,24 +110,36 @@ async def atualizar_documento(
             doc_tipo=doc_tipo,
             status=status_val,
             observacoes=body.observacoes,
+            data_inicio=body.data_inicio,
+            data_prazo=body.data_prazo,
+            data_conclusao=data_conclusao,
         )
         .on_conflict_do_update(
             constraint="uq_doc_status_emp_tipo",
             set_={
                 "status": status_val,
                 "observacoes": body.observacoes,
+                "data_inicio": body.data_inicio,
+                "data_prazo": body.data_prazo,
+                "data_conclusao": data_conclusao,
             },
         )
         .returning(
             DocumentoStatus.doc_tipo,
             DocumentoStatus.status,
             DocumentoStatus.observacoes,
+            DocumentoStatus.data_inicio,
+            DocumentoStatus.data_prazo,
+            DocumentoStatus.data_conclusao,
         )
     )
     result = await db.execute(upsert)
     row = result.one()
     await db.commit()
-    return DocStatusOut(doc_tipo=row.doc_tipo, status=row.status, observacoes=row.observacoes)
+    return DocStatusOut(
+        doc_tipo=row.doc_tipo, status=row.status, observacoes=row.observacoes,
+        data_inicio=row.data_inicio, data_prazo=row.data_prazo, data_conclusao=row.data_conclusao,
+    )
 
 
 @router.get("/documentos/matriz", response_model=list[MatrizEmp])

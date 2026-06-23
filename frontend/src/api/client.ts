@@ -358,6 +358,17 @@ export interface DocStatus {
   doc_tipo: string;
   status: string;
   observacoes?: string | null;
+  data_inicio?: string | null;
+  data_prazo?: string | null;
+  data_conclusao?: string | null;
+}
+
+export interface DocStatusPayload {
+  status: string;
+  observacoes?: string | null;
+  data_inicio?: string | null;
+  data_prazo?: string | null;
+  data_conclusao?: string | null;
 }
 
 export interface MatrizEmp {
@@ -369,8 +380,8 @@ export interface MatrizEmp {
 export const documentosApi = {
   listar: (empId: string): Promise<DocStatus[]> =>
     api.get(`/api/v1/empreendimentos/${empId}/documentos`).then(r => r.data),
-  atualizar: (empId: string, docTipo: string, status: string, observacoes?: string | null): Promise<DocStatus> =>
-    api.put(`/api/v1/empreendimentos/${empId}/documentos/${docTipo}`, { status, observacoes }).then(r => r.data),
+  atualizar: (empId: string, docTipo: string, payload: DocStatusPayload): Promise<DocStatus> =>
+    api.put(`/api/v1/empreendimentos/${empId}/documentos/${docTipo}`, payload).then(r => r.data),
   matriz: (): Promise<MatrizEmp[]> =>
     api.get("/api/v1/documentos/matriz").then(r => r.data),
 };
