@@ -152,8 +152,8 @@ function CatRow({
           <td className="px-4 py-1 whitespace-nowrap">
             <div className="flex items-center gap-2">
               <span className="text-sm text-slate-700">{doc.label}</span>
-              <span className={clsx("text-[10px] font-medium px-1.5 py-0.5 rounded-full", RESPONSAVEIS[doc.responsavel].cor)}
-                title={`Responsável padrão — ${RESPONSAVEIS[doc.responsavel].papel}`}>
+              <span className={clsx("text-[10px] font-medium px-1.5 py-0.5 rounded-full cursor-help", RESPONSAVEIS[doc.responsavel].cor)}
+                title={`Responsável padrão: ${doc.responsavel} — ${RESPONSAVEIS[doc.responsavel].papel}.\nPara alterar o responsável deste documento, abra Empreendimentos › selecione o empreendimento › aba Documentos.`}>
                 {doc.responsavel}
               </span>
               {doc.taxa && (
