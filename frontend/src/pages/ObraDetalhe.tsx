@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft, Bot, Building2, CalendarDays, DollarSign,
-  Loader2, Plus, RefreshCw, Trash2,
+  Loader2, Plus, RefreshCw, Trash2, Pencil,
 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -13,6 +13,7 @@ import { OrcamentoForm } from "@/components/orcamentos/OrcamentoForm";
 import { CustoRealizadoForm } from "@/components/orcamentos/CustoRealizadoForm";
 import { CentroCustoTab } from "@/components/obras/CentroCustoTab";
 import { RDOForm } from "@/components/rdo/RDOForm";
+import { ObraForm } from "@/components/obras/ObraForm";
 import { Badge } from "@/components/ui/Badge";
 import type {
   AnaliseIA, CustoRealizado, ObraDetalhe as ObraDetalheType,
@@ -437,6 +438,7 @@ export function ObraDetalhe() {
   };
   const [analiseIA, setAnaliseIA] = useState<AnaliseIA | null>(null);
   const [carregandoIA, setCarregandoIA] = useState(false);
+  const [editAberto, setEditAberto] = useState(false);
 
   const { data: obra, isLoading } = useQuery<ObraDetalheType>({
     queryKey: ["obra", id],
@@ -502,14 +504,31 @@ export function ObraDetalhe() {
             )}
           </div>
         </div>
-        <button
-          onClick={() => qc.invalidateQueries({ queryKey: ["obra", id] })}
-          className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors"
-          title="Atualizar dados"
-        >
-          <RefreshCw size={16} />
-        </button>
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            onClick={() => setEditAberto(true)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 text-slate-600 hover:border-brand-300 hover:text-brand-600 hover:bg-brand-50 transition-colors text-sm font-medium"
+            title="Editar obra"
+          >
+            <Pencil size={14} /> <span className="hidden sm:inline">Editar</span>
+          </button>
+          <button
+            onClick={() => qc.invalidateQueries({ queryKey: ["obra", id] })}
+            className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors"
+            title="Atualizar dados"
+          >
+            <RefreshCw size={16} />
+          </button>
+        </div>
       </div>
+
+      {/* Modal de edição da obra */}
+      <ObraForm
+        aberto={editAberto}
+        onFechar={() => setEditAberto(false)}
+        empreendimentoId={obra.empreendimento_id}
+        obra={obra}
+      />
 
       {/* Progresso geral */}
       <div className="bg-white rounded-xl border border-slate-200 p-5">

@@ -54,6 +54,7 @@ export function ObraForm({ aberto, onFechar, empreendimentoId, obra }: Props) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["obras", empreendimentoId] });
       qc.invalidateQueries({ queryKey: ["empreendimentos"] });
+      if (edicao) qc.invalidateQueries({ queryKey: ["obra", obra!.id] });  // atualiza a tela de detalhe
       onFechar();
       setForm(vazio());
       setErro("");
