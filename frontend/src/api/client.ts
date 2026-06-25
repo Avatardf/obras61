@@ -513,6 +513,7 @@ export interface Unidade {
   area_privativa_m2: number | null;
   area_total_m2: number | null;
   fracao_ideal: number | null;
+  custo: number | null;
   preco_tabela: number | null;
   status: StatusUnidade;
   cliente_nome: string | null;
@@ -529,6 +530,19 @@ export interface AndarConfig {
   tipo?: string | null;
   area_privativa_m2?: number | null;
   preco_tabela?: number | null;
+  orientacao_solar?: string | null;
+}
+
+export interface UnidadeLoteItem {
+  id?: string | null;
+  grupo: string;
+  identificador: string;
+  tipo?: string | null;
+  pavimento?: number | null;
+  area_privativa_m2?: number | null;
+  custo?: number | null;
+  preco_tabela?: number | null;
+  valor_venda?: number | null;
   orientacao_solar?: string | null;
 }
 
@@ -553,6 +567,8 @@ export const unidadesApi = {
     api.post(`/api/v1/empreendimentos/${empId}/unidades/gerar`, data).then(r => r.data),
   gerarPorAndar: (empId: string, data: { grupo: string; andares: AndarConfig[] }): Promise<Unidade[]> =>
     api.post(`/api/v1/empreendimentos/${empId}/unidades/gerar-por-andar`, data).then(r => r.data),
+  salvarLote: (empId: string, unidades: UnidadeLoteItem[]): Promise<Unidade[]> =>
+    api.put(`/api/v1/empreendimentos/${empId}/unidades/lote`, { unidades }).then(r => r.data),
   atualizar: (id: string, data: Partial<Unidade>): Promise<Unidade> =>
     api.patch(`/api/v1/unidades/${id}`, data).then(r => r.data),
   excluir: (id: string): Promise<void> =>

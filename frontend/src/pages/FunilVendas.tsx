@@ -131,7 +131,15 @@ function LeadModal({ lead, onClose }: { lead?: Lead | null; onClose: () => void 
               <label className="block text-xs font-medium text-slate-600 mb-1.5">Unidade</label>
               <select value={unidadeId} onChange={e => setUnidadeId(e.target.value)} disabled={!empId} className={clsx(inputClass, "bg-white disabled:opacity-50")}>
                 <option value="">— Nenhuma —</option>
-                {unidades.map(u => <option key={u.id} value={u.id}>{u.grupo} · {u.identificador}</option>)}
+                {unidades.map(u => (
+                  <option key={u.id} value={u.id}>
+                    {u.grupo} · {u.identificador}
+                    {u.pavimento != null ? ` · ${u.pavimento}º andar` : ""}
+                    {u.area_privativa_m2 ? ` · ${u.area_privativa_m2}m²` : ""}
+                    {u.preco_tabela ? ` · ${u.preco_tabela.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 })}` : ""}
+                    {u.status !== "disponivel" ? ` · (${u.status})` : ""}
+                  </option>
+                ))}
               </select>
             </div>
           </div>

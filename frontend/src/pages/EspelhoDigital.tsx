@@ -34,6 +34,7 @@ const inputClass = "w-full px-3 py-2 text-sm border border-slate-200 rounded-lg 
 function UnidadeModal({ unidade, onClose }: { unidade: Unidade; onClose: () => void }) {
   const qc = useQueryClient();
   const [status, setStatus] = useState<StatusUnidade>(unidade.status);
+  const [custo, setCusto] = useState(unidade.custo?.toString() ?? "");
   const [precoTabela, setPrecoTabela] = useState(unidade.preco_tabela?.toString() ?? "");
   const [area, setArea] = useState(unidade.area_privativa_m2?.toString() ?? "");
   const [cliente, setCliente] = useState(unidade.cliente_nome ?? "");
@@ -46,6 +47,7 @@ function UnidadeModal({ unidade, onClose }: { unidade: Unidade; onClose: () => v
   const salvar = useMutation({
     mutationFn: () => unidadesApi.atualizar(unidade.id, {
       status,
+      custo: custo ? Number(custo) : null,
       preco_tabela: precoTabela ? Number(precoTabela) : null,
       area_privativa_m2: area ? Number(area) : null,
       cliente_nome: mostraVenda ? (cliente || null) : null,
@@ -99,6 +101,10 @@ function UnidadeModal({ unidade, onClose }: { unidade: Unidade; onClose: () => v
           </div>
 
           <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1.5">Custo (R$)</label>
+              <input type="number" value={custo} onChange={e => setCusto(e.target.value)} className={inputClass} placeholder="220000" />
+            </div>
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1.5">Preço de tabela (R$)</label>
               <input type="number" value={precoTabela} onChange={e => setPrecoTabela(e.target.value)} className={inputClass} placeholder="350000" />
@@ -169,6 +175,7 @@ export function EspelhoDigital() {
   });
   const lista = empreendimentos?.items ?? [];
   const empSelecionado = empId || lista[0]?.id || "";
+  const empAtual = lista.find((e: any) => e.id === empSelecionado);
 
   const { data: unidades = [], isLoading } = useQuery({
     queryKey: ["unidades", empSelecionado],
@@ -211,7 +218,7 @@ export function EspelhoDigital() {
             {empSelecionado && (
               <button onClick={() => navigate(`/espelho/${empSelecionado}/gerar`)}
                 className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 whitespace-nowrap">
-                <Plus size={15} /> Gerar
+                <Plus size={15} /> Cadastrar unidades
               </button>
             )}
           </div>
@@ -247,6 +254,14 @@ export function EspelhoDigital() {
                   })}
                 </div>
                 <div className="flex flex-wrap gap-x-8 gap-y-1 mt-4 pt-3 border-t border-slate-100">
+                  {empAtual?.num_unidades != null && (
+                    <p className="text-xs text-slate-500">
+                      Cadastradas: <strong className={clsx(resumo.total >= empAtual.num_unidades ? "text-emerald-700" : "text-slate-700")}>{resumo.total} de {empAtual.num_unidades}</strong>
+                    </p>
+                  )}
+                  {empAtual?.num_pavimentos_estimado != null && (
+                    <p className="text-xs text-slate-500">Andares: <strong className="text-slate-700">{empAtual.num_pavimentos_estimado}</strong></p>
+                  )}
                   <p className="text-xs text-slate-500">VGV tabela: <strong className="text-slate-700">{fmt(resumo.vgv_tabela)}</strong></p>
                   <p className="text-xs text-slate-500">VGV vendido: <strong className="text-blue-700">{fmt(resumo.vgv_vendido)}</strong></p>
                   {resumo.vgv_tabela > 0 && (

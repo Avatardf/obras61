@@ -10,6 +10,7 @@ from sqlalchemy.orm import selectinload
 from app.database import get_db
 from app.dependencies import CurrentUser
 from app.models.obra import Empreendimento, EstimativaCusto, Obra
+from app.models.unidade import Unidade
 from app.schemas.empreendimento import (
     EmpreendimentoCreate,
     EmpreendimentoDetalhe,
@@ -157,6 +158,18 @@ async def atualizar(id: uuid.UUID, body: EmpreendimentoUpdate, db: DB, current_u
     dados = body.model_dump(exclude_unset=True)
     if "endereco" in dados and dados["endereco"]:
         dados["endereco"] = body.endereco.model_dump()
+
+    # Não permite reduzir num_unidades abaixo do que já está cadastrado no espelho
+    if dados.get("num_unidades") is not None:
+        cadastradas = (await db.execute(
+            select(func.count(Unidade.id)).where(Unidade.empreendimento_id == id)
+        )).scalar_one()
+        if dados["num_unidades"] < cadastradas:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Já existem {cadastradas} unidades cadastradas no espelho digital. "
+                       f"Exclua unidades antes de reduzir o número para {dados['num_unidades']}.",
+            )
 
     for campo, valor in dados.items():
         setattr(emp, campo, valor)

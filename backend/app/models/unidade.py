@@ -43,7 +43,8 @@ class Unidade(Base, TenantMixin, TimestampMixin):
     area_privativa_m2: Mapped[float | None] = mapped_column(NUMERIC(10, 2), nullable=True)
     area_total_m2: Mapped[float | None] = mapped_column(NUMERIC(10, 2), nullable=True)
     fracao_ideal: Mapped[float | None] = mapped_column(NUMERIC(8, 6), nullable=True)
-    preco_tabela: Mapped[float | None] = mapped_column(NUMERIC(15, 2), nullable=True)
+    custo: Mapped[float | None] = mapped_column(NUMERIC(15, 2), nullable=True)         # custo de produção da unidade
+    preco_tabela: Mapped[float | None] = mapped_column(NUMERIC(15, 2), nullable=True)  # preço de tabela/anúncio
 
     status: Mapped[StatusUnidade] = mapped_column(
         Enum(StatusUnidade, native_enum=False), default=StatusUnidade.disponivel, index=True

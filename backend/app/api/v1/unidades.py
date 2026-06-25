@@ -30,6 +30,7 @@ class UnidadeResponse(BaseModel):
     area_privativa_m2: float | None
     area_total_m2: float | None
     fracao_ideal: float | None
+    custo: float | None
     preco_tabela: float | None
     status: str
     cliente_nome: str | None
@@ -49,6 +50,7 @@ class UnidadeCreate(BaseModel):
     area_privativa_m2: float | None = None
     area_total_m2: float | None = None
     fracao_ideal: float | None = None
+    custo: float | None = None
     preco_tabela: float | None = None
     status: StatusUnidade = StatusUnidade.disponivel
     orientacao_solar: str | None = None
@@ -62,6 +64,7 @@ class UnidadeUpdate(BaseModel):
     area_privativa_m2: float | None = None
     area_total_m2: float | None = None
     fracao_ideal: float | None = None
+    custo: float | None = None
     preco_tabela: float | None = None
     status: StatusUnidade | None = None
     cliente_nome: str | None = None
@@ -96,6 +99,23 @@ class GerarPorAndar(BaseModel):
     andares: list[AndarConfig] = Field(min_length=1, max_length=200)
 
 
+class UnidadeLoteItem(BaseModel):
+    id: uuid.UUID | None = None                 # presente = atualiza; ausente = cria
+    grupo: str = Field(min_length=1, max_length=60)
+    identificador: str = Field(min_length=1, max_length=40)
+    tipo: str | None = None
+    pavimento: int | None = None
+    area_privativa_m2: float | None = None
+    custo: float | None = None
+    preco_tabela: float | None = None
+    valor_venda: float | None = None
+    orientacao_solar: str | None = None
+
+
+class SalvarLote(BaseModel):
+    unidades: list[UnidadeLoteItem] = Field(max_length=2000)
+
+
 class ResumoEspelho(BaseModel):
     total: int
     por_status: dict[str, int]
@@ -117,6 +137,22 @@ async def _unidade(db: AsyncSession, uid: uuid.UUID, tenant_id) -> Unidade:
     if not u or u.tenant_id != tenant_id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Unidade não encontrada")
     return u
+
+
+async def _contar_unidades(db: AsyncSession, emp_id: uuid.UUID) -> int:
+    return (await db.execute(
+        select(func.count(Unidade.id)).where(Unidade.empreendimento_id == emp_id)
+    )).scalar_one()
+
+
+async def _assert_capacidade(db: AsyncSession, emp: Empreendimento, total_desejado: int) -> None:
+    """Teto rígido: o nº de unidades não pode passar do declarado no empreendimento."""
+    if emp.num_unidades is not None and total_desejado > emp.num_unidades:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            f"Este empreendimento declarou {emp.num_unidades} unidades. "
+            f"Para cadastrar mais, exclua unidades ou aumente o número de unidades no cadastro do empreendimento.",
+        )
 
 
 # ── Endpoints ──────────────────────────────────────────────────────────────────
@@ -156,7 +192,8 @@ async def resumo_espelho(emp_id: uuid.UUID, db: AsyncSession = DB, user: Current
 
 @router.post("/empreendimentos/{emp_id}/unidades", response_model=UnidadeResponse, status_code=status.HTTP_201_CREATED)
 async def criar_unidade(emp_id: uuid.UUID, body: UnidadeCreate, db: AsyncSession = DB, user: CurrentUser = None):
-    await _empreendimento(db, emp_id, user.tenant_id)
+    emp = await _empreendimento(db, emp_id, user.tenant_id)
+    await _assert_capacidade(db, emp, await _contar_unidades(db, emp_id) + 1)
     u = Unidade(id=uuid.uuid4(), tenant_id=user.tenant_id, empreendimento_id=emp_id, **body.model_dump())
     db.add(u)
     await db.commit()
@@ -167,7 +204,7 @@ async def criar_unidade(emp_id: uuid.UUID, body: UnidadeCreate, db: AsyncSession
 @router.post("/empreendimentos/{emp_id}/unidades/gerar", response_model=list[UnidadeResponse], status_code=status.HTTP_201_CREATED)
 async def gerar_unidades(emp_id: uuid.UUID, body: GerarUnidades, db: AsyncSession = DB, user: CurrentUser = None):
     """Gera N unidades sequenciais de um grupo (ex: Quadra 1, lotes 1..20)."""
-    await _empreendimento(db, emp_id, user.tenant_id)
+    emp = await _empreendimento(db, emp_id, user.tenant_id)
     # Evita duplicar identificadores já existentes no mesmo grupo
     existentes = (await db.execute(
         select(Unidade.identificador).where(
@@ -187,6 +224,7 @@ async def gerar_unidades(emp_id: uuid.UUID, body: GerarUnidades, db: AsyncSessio
             area_privativa_m2=body.area_privativa_m2, preco_tabela=body.preco_tabela,
             status=StatusUnidade.disponivel,
         ))
+    await _assert_capacidade(db, emp, await _contar_unidades(db, emp_id) + len(novas))
     db.add_all(novas)
     await db.commit()
     for u in novas:
@@ -198,7 +236,7 @@ async def gerar_unidades(emp_id: uuid.UUID, body: GerarUnidades, db: AsyncSessio
 async def gerar_unidades_por_andar(emp_id: uuid.UUID, body: GerarPorAndar, db: AsyncSession = DB, user: CurrentUser = None):
     """Gera unidades em lote, andar a andar — cada andar pode ter quantidade,
     área, preço e orientação solar diferentes (ex: 101-104, 201-204, 301-302)."""
-    await _empreendimento(db, emp_id, user.tenant_id)
+    emp = await _empreendimento(db, emp_id, user.tenant_id)
     existentes = (await db.execute(
         select(Unidade.identificador).where(
             Unidade.empreendimento_id == emp_id, Unidade.grupo == body.grupo
@@ -220,11 +258,79 @@ async def gerar_unidades_por_andar(emp_id: uuid.UUID, body: GerarPorAndar, db: A
                 area_privativa_m2=cfg.area_privativa_m2, preco_tabela=cfg.preco_tabela,
                 orientacao_solar=cfg.orientacao_solar, status=StatusUnidade.disponivel,
             ))
+    await _assert_capacidade(db, emp, await _contar_unidades(db, emp_id) + len(novas))
     db.add_all(novas)
     await db.commit()
     for u in novas:
         await db.refresh(u)
     return novas
+
+
+@router.put("/empreendimentos/{emp_id}/unidades/lote", response_model=list[UnidadeResponse])
+async def salvar_lote_unidades(emp_id: uuid.UUID, body: SalvarLote, db: AsyncSession = DB, user: CurrentUser = None):
+    """Salva a lista completa de unidades do empreendimento (cadastro manual).
+
+    Reconcilia o estado: itens com `id` são atualizados, sem `id` são criados,
+    e unidades existentes ausentes da lista são removidas — desde que estejam
+    'disponivel' (vendidas/reservadas são protegidas). Respeita o teto rígido
+    de `num_unidades` declarado no empreendimento.
+    """
+    emp = await _empreendimento(db, emp_id, user.tenant_id)
+
+    # Teto rígido
+    await _assert_capacidade(db, emp, len(body.unidades))
+
+    # Não permite identificadores duplicados (mesmo grupo) na lista enviada
+    vistos: set[tuple[str, str]] = set()
+    for item in body.unidades:
+        chave = (item.grupo, item.identificador)
+        if chave in vistos:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                f"Identificador duplicado: {item.grupo} · {item.identificador}",
+            )
+        vistos.add(chave)
+
+    # Estado atual
+    existentes = (await db.execute(
+        select(Unidade).where(Unidade.empreendimento_id == emp_id, Unidade.tenant_id == user.tenant_id)
+    )).scalars().all()
+    por_id = {u.id: u for u in existentes}
+    ids_enviados = {item.id for item in body.unidades if item.id is not None}
+
+    # Remoções: existentes ausentes da lista — protege não-disponíveis
+    for u in existentes:
+        if u.id not in ids_enviados:
+            if u.status != StatusUnidade.disponivel:
+                raise HTTPException(
+                    status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    f"A unidade {u.grupo} · {u.identificador} está '{u.status}' e não pode ser removida.",
+                )
+            await db.delete(u)
+
+    campos = ("grupo", "identificador", "tipo", "pavimento", "area_privativa_m2",
+              "custo", "preco_tabela", "valor_venda", "orientacao_solar")
+    resultado: list[Unidade] = []
+    for item in body.unidades:
+        if item.id is not None and item.id in por_id:
+            u = por_id[item.id]
+            for c in campos:
+                setattr(u, c, getattr(item, c))
+            resultado.append(u)
+        else:
+            u = Unidade(
+                id=uuid.uuid4(), tenant_id=user.tenant_id, empreendimento_id=emp_id,
+                status=StatusUnidade.disponivel,
+                **{c: getattr(item, c) for c in campos},
+            )
+            db.add(u)
+            resultado.append(u)
+
+    await db.commit()
+    for u in resultado:
+        await db.refresh(u)
+    resultado.sort(key=lambda u: (u.grupo, u.identificador))
+    return resultado
 
 
 @router.patch("/unidades/{uid}", response_model=UnidadeResponse)
