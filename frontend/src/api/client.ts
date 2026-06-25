@@ -519,6 +519,17 @@ export interface Unidade {
   valor_venda: number | null;
   data_venda: string | null;
   observacao: string | null;
+  orientacao_solar: string | null;
+}
+
+export interface AndarConfig {
+  andar: number;
+  quantidade: number;
+  inicio?: number | null;
+  tipo?: string | null;
+  area_privativa_m2?: number | null;
+  preco_tabela?: number | null;
+  orientacao_solar?: string | null;
 }
 
 export interface ResumoEspelho {
@@ -540,6 +551,8 @@ export const unidadesApi = {
     inicio?: number; prefixo?: string; area_privativa_m2?: number | null; preco_tabela?: number | null;
   }): Promise<Unidade[]> =>
     api.post(`/api/v1/empreendimentos/${empId}/unidades/gerar`, data).then(r => r.data),
+  gerarPorAndar: (empId: string, data: { grupo: string; andares: AndarConfig[] }): Promise<Unidade[]> =>
+    api.post(`/api/v1/empreendimentos/${empId}/unidades/gerar-por-andar`, data).then(r => r.data),
   atualizar: (id: string, data: Partial<Unidade>): Promise<Unidade> =>
     api.patch(`/api/v1/unidades/${id}`, data).then(r => r.data),
   excluir: (id: string): Promise<void> =>

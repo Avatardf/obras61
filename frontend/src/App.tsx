@@ -22,6 +22,7 @@ import { Documentos } from "@/pages/Documentos";
 import { Usuarios } from "@/pages/Usuarios";
 import { Equipes } from "@/pages/Equipes";
 import { EspelhoDigital } from "@/pages/EspelhoDigital";
+import { GerarUnidades } from "@/pages/GerarUnidades";
 import { FunilVendas } from "@/pages/FunilVendas";
 
 const titulos: Record<string, string> = {
@@ -206,6 +207,11 @@ export default function App() {
         <Route path="/espelho" element={
           <PrivatePage path="/espelho">
             <EspelhoDigital />
+          </PrivatePage>
+        } />
+        <Route path="/espelho/:empId/gerar" element={
+          <PrivatePage path="/espelho/:empId/gerar">
+            <GerarUnidades />
           </PrivatePage>
         } />
 

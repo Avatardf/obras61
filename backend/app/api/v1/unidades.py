@@ -36,6 +36,7 @@ class UnidadeResponse(BaseModel):
     valor_venda: float | None
     data_venda: date | None
     observacao: str | None
+    orientacao_solar: str | None
 
     model_config = {"from_attributes": True}
 
@@ -50,6 +51,7 @@ class UnidadeCreate(BaseModel):
     fracao_ideal: float | None = None
     preco_tabela: float | None = None
     status: StatusUnidade = StatusUnidade.disponivel
+    orientacao_solar: str | None = None
 
 
 class UnidadeUpdate(BaseModel):
@@ -66,6 +68,7 @@ class UnidadeUpdate(BaseModel):
     valor_venda: float | None = None
     data_venda: date | None = None
     observacao: str | None = None
+    orientacao_solar: str | None = None
 
 
 class GerarUnidades(BaseModel):
@@ -76,6 +79,21 @@ class GerarUnidades(BaseModel):
     prefixo: str = ""                           # ex: "Apto " → "Apto 101"
     area_privativa_m2: float | None = None
     preco_tabela: float | None = None
+
+
+class AndarConfig(BaseModel):
+    andar: int = Field(ge=0, le=300)
+    quantidade: int = Field(ge=1, le=100)
+    inicio: int | None = None                   # se omitido, usa andar*100 + 1
+    tipo: str | None = None
+    area_privativa_m2: float | None = None
+    preco_tabela: float | None = None
+    orientacao_solar: str | None = None         # nascente, poente, ambas
+
+
+class GerarPorAndar(BaseModel):
+    grupo: str = Field(min_length=1, max_length=60)
+    andares: list[AndarConfig] = Field(min_length=1, max_length=200)
 
 
 class ResumoEspelho(BaseModel):
@@ -169,6 +187,39 @@ async def gerar_unidades(emp_id: uuid.UUID, body: GerarUnidades, db: AsyncSessio
             area_privativa_m2=body.area_privativa_m2, preco_tabela=body.preco_tabela,
             status=StatusUnidade.disponivel,
         ))
+    db.add_all(novas)
+    await db.commit()
+    for u in novas:
+        await db.refresh(u)
+    return novas
+
+
+@router.post("/empreendimentos/{emp_id}/unidades/gerar-por-andar", response_model=list[UnidadeResponse], status_code=status.HTTP_201_CREATED)
+async def gerar_unidades_por_andar(emp_id: uuid.UUID, body: GerarPorAndar, db: AsyncSession = DB, user: CurrentUser = None):
+    """Gera unidades em lote, andar a andar — cada andar pode ter quantidade,
+    área, preço e orientação solar diferentes (ex: 101-104, 201-204, 301-302)."""
+    await _empreendimento(db, emp_id, user.tenant_id)
+    existentes = (await db.execute(
+        select(Unidade.identificador).where(
+            Unidade.empreendimento_id == emp_id, Unidade.grupo == body.grupo
+        )
+    )).scalars().all()
+    existentes_set = set(existentes)
+
+    novas: list[Unidade] = []
+    for cfg in body.andares:
+        inicio = cfg.inicio if cfg.inicio is not None else cfg.andar * 100 + 1
+        for i in range(cfg.quantidade):
+            ident = str(inicio + i)
+            if ident in existentes_set:
+                continue
+            existentes_set.add(ident)
+            novas.append(Unidade(
+                id=uuid.uuid4(), tenant_id=user.tenant_id, empreendimento_id=emp_id,
+                grupo=body.grupo, identificador=ident, tipo=cfg.tipo, pavimento=cfg.andar,
+                area_privativa_m2=cfg.area_privativa_m2, preco_tabela=cfg.preco_tabela,
+                orientacao_solar=cfg.orientacao_solar, status=StatusUnidade.disponivel,
+            ))
     db.add_all(novas)
     await db.commit()
     for u in novas:

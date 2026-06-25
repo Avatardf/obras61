@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import {
-  Building2, Plus, Layers, Loader2, AlertCircle, X, Trash2, Wand2,
+  Building2, Plus, Layers, Loader2, X, Trash2,
 } from "lucide-react";
 import { clsx } from "clsx";
 import {
@@ -21,6 +22,10 @@ const STATUS: Record<StatusUnidade, { label: string; chip: string; cell: string;
 };
 const STATUS_ORDEM: StatusUnidade[] = ["disponivel", "pre_reserva", "reservado", "vendido", "permuta", "indisponivel"];
 
+export const ORIENTACOES: Record<string, string> = {
+  nascente: "Nascente (leste)", poente: "Poente (oeste)", ambas: "Ambas faces",
+};
+
 const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 const inputClass = "w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500";
 
@@ -34,6 +39,7 @@ function UnidadeModal({ unidade, onClose }: { unidade: Unidade; onClose: () => v
   const [cliente, setCliente] = useState(unidade.cliente_nome ?? "");
   const [valorVenda, setValorVenda] = useState(unidade.valor_venda?.toString() ?? "");
   const [obs, setObs] = useState(unidade.observacao ?? "");
+  const [orientacao, setOrientacao] = useState(unidade.orientacao_solar ?? "");
 
   const mostraVenda = status === "vendido" || status === "reservado" || status === "pre_reserva";
 
@@ -45,6 +51,7 @@ function UnidadeModal({ unidade, onClose }: { unidade: Unidade; onClose: () => v
       cliente_nome: mostraVenda ? (cliente || null) : null,
       valor_venda: mostraVenda && valorVenda ? Number(valorVenda) : null,
       observacao: obs || null,
+      orientacao_solar: orientacao || null,
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["unidades"] });
@@ -102,6 +109,14 @@ function UnidadeModal({ unidade, onClose }: { unidade: Unidade; onClose: () => v
             </div>
           </div>
 
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1.5">Orientação solar</label>
+            <select value={orientacao} onChange={e => setOrientacao(e.target.value)} className={clsx(inputClass, "bg-white")}>
+              <option value="">— Não definida —</option>
+              {Object.entries(ORIENTACOES).map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+            </select>
+          </div>
+
           {mostraVenda && (
             <div className="space-y-3 bg-slate-50 rounded-lg p-3 border border-slate-200">
               <p className="text-xs font-semibold text-slate-600">Dados da negociação</p>
@@ -141,112 +156,12 @@ function UnidadeModal({ unidade, onClose }: { unidade: Unidade; onClose: () => v
   );
 }
 
-// ── Modal de geração em massa ──────────────────────────────────────────────────
-
-function GerarModal({ empId, onClose }: { empId: string; onClose: () => void }) {
-  const qc = useQueryClient();
-  const [grupo, setGrupo] = useState("");
-  const [tipo, setTipo] = useState("apartamento");
-  const [quantidade, setQuantidade] = useState("10");
-  const [inicio, setInicio] = useState("101");
-  const [prefixo, setPrefixo] = useState("");
-  const [area, setArea] = useState("");
-  const [preco, setPreco] = useState("");
-  const [erro, setErro] = useState("");
-
-  const gerar = useMutation({
-    mutationFn: () => unidadesApi.gerar(empId, {
-      grupo, tipo, quantidade: Number(quantidade), inicio: Number(inicio),
-      prefixo, area_privativa_m2: area ? Number(area) : null, preco_tabela: preco ? Number(preco) : null,
-    }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["unidades"] });
-      qc.invalidateQueries({ queryKey: ["espelho-resumo"] });
-      onClose();
-    },
-    onError: (e: any) => setErro(e?.response?.data?.detail ?? "Erro ao gerar unidades"),
-  });
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <h2 className="text-base font-semibold text-slate-800 flex items-center gap-2">
-            <Wand2 size={16} className="text-brand-600" /> Gerar unidades em lote
-          </h2>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100">
-            <X size={16} />
-          </button>
-        </div>
-        <div className="px-6 py-5 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1.5">Grupo *</label>
-              <input value={grupo} onChange={e => setGrupo(e.target.value)} className={inputClass} placeholder="Quadra 1 / Torre A" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1.5">Tipo</label>
-              <select value={tipo} onChange={e => setTipo(e.target.value)} className={clsx(inputClass, "bg-white")}>
-                <option value="apartamento">Apartamento</option>
-                <option value="lote">Lote</option>
-                <option value="casa">Casa</option>
-                <option value="sala">Sala comercial</option>
-              </select>
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1.5">Quantidade *</label>
-              <input type="number" value={quantidade} onChange={e => setQuantidade(e.target.value)} className={inputClass} />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1.5">Nº inicial</label>
-              <input type="number" value={inicio} onChange={e => setInicio(e.target.value)} className={inputClass} />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1.5">Prefixo</label>
-              <input value={prefixo} onChange={e => setPrefixo(e.target.value)} className={inputClass} placeholder="Apto " />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1.5">Área padrão (m²)</label>
-              <input type="number" value={area} onChange={e => setArea(e.target.value)} className={inputClass} placeholder="48" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1.5">Preço padrão (R$)</label>
-              <input type="number" value={preco} onChange={e => setPreco(e.target.value)} className={inputClass} placeholder="350000" />
-            </div>
-          </div>
-          <p className="text-xs text-slate-400">
-            Exemplo: gera <strong>{quantidade || 0}</strong> unidades de "{prefixo}{inicio || 0}" a "{prefixo}{Number(inicio || 0) + Number(quantidade || 1) - 1}" no grupo <strong>{grupo || "—"}</strong>.
-          </p>
-          {erro && (
-            <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">
-              <AlertCircle size={14} /> {erro}
-            </div>
-          )}
-          <div className="flex gap-2 pt-1">
-            <button onClick={onClose} className="flex-1 px-4 py-2.5 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">Cancelar</button>
-            <button onClick={() => { setErro(""); if (!grupo.trim()) { setErro("Informe o grupo"); return; } gerar.mutate(); }}
-              disabled={gerar.isPending}
-              className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 disabled:opacity-60 flex items-center justify-center gap-2">
-              {gerar.isPending && <Loader2 size={14} className="animate-spin" />}
-              Gerar
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── Página principal ───────────────────────────────────────────────────────────
 
 export function EspelhoDigital() {
+  const navigate = useNavigate();
   const [empId, setEmpId] = useState<string>("");
   const [editando, setEditando] = useState<Unidade | null>(null);
-  const [gerando, setGerando] = useState(false);
 
   const { data: empreendimentos } = useQuery({
     queryKey: ["empreendimentos", { espelho: true }],
@@ -276,7 +191,6 @@ export function EspelhoDigital() {
   return (
     <>
       {editando && <UnidadeModal unidade={editando} onClose={() => setEditando(null)} />}
-      {gerando && empSelecionado && <GerarModal empId={empSelecionado} onClose={() => setGerando(false)} />}
 
       <div className="p-6 max-w-6xl mx-auto">
         {/* Cabeçalho + seletor */}
@@ -295,7 +209,7 @@ export function EspelhoDigital() {
               {lista.map((e: any) => <option key={e.id} value={e.id}>{e.nome}</option>)}
             </select>
             {empSelecionado && (
-              <button onClick={() => setGerando(true)}
+              <button onClick={() => navigate(`/espelho/${empSelecionado}/gerar`)}
                 className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 whitespace-nowrap">
                 <Plus size={15} /> Gerar
               </button>
@@ -363,7 +277,7 @@ export function EspelhoDigital() {
                     <div className="grid grid-cols-4 sm:grid-cols-8 lg:grid-cols-12 gap-1.5">
                       {us.map(u => (
                         <button key={u.id} onClick={() => setEditando(u)}
-                          title={`${u.identificador} · ${STATUS[u.status].label}${u.cliente_nome ? " · " + u.cliente_nome : ""}`}
+                          title={`${u.identificador} · ${STATUS[u.status].label}${u.area_privativa_m2 ? " · " + u.area_privativa_m2 + "m²" : ""}${u.orientacao_solar ? " · " + ORIENTACOES[u.orientacao_solar] : ""}${u.cliente_nome ? " · " + u.cliente_nome : ""}`}
                           className={clsx(
                             "aspect-square rounded-lg flex flex-col items-center justify-center text-[11px] font-semibold leading-none transition-all hover:scale-105 hover:shadow-md",
                             STATUS[u.status].cell

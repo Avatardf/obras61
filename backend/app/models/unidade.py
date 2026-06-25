@@ -55,5 +55,6 @@ class Unidade(Base, TenantMixin, TimestampMixin):
     data_venda: Mapped[date | None] = mapped_column(DATE, nullable=True)
 
     observacao: Mapped[str | None] = mapped_column(Text, nullable=True)
+    orientacao_solar: Mapped[str | None] = mapped_column(String(20), nullable=True)  # nascente, poente, ambas
 
     empreendimento = relationship("Empreendimento")
