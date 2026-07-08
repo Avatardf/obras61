@@ -31,7 +31,7 @@ async def listar(
     db: DB,
     current_user: CurrentUser,
     pagina: int = Query(default=1, ge=1),
-    por_pagina: int = Query(default=12, ge=1, le=100),
+    por_pagina: int = Query(default=12, ge=1, le=200),
     status: str | None = Query(default=None),
     busca: str | None = Query(default=None),
 ):

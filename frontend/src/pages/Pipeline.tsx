@@ -311,7 +311,7 @@ export function Pipeline() {
   const [busca, setBusca] = useState("");
 
   // Fetch all pages (up to 200) so the pipeline shows everything
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ["empreendimentos", "pipeline"],
     queryFn: () =>
       empreendimentosApi.listar({ por_pagina: 200, pagina: 1 }),
@@ -344,6 +344,17 @@ export function Pipeline() {
     return (
       <div className="p-6 flex items-center justify-center h-64">
         <div className="text-slate-400 text-sm">Carregando pipeline…</div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="p-6 flex items-center justify-center h-64">
+        <div className="text-center">
+          <p className="text-sm font-medium text-red-600">Não foi possível carregar o pipeline.</p>
+          <p className="text-xs text-slate-400 mt-1">Recarregue a página. Se persistir, contate o suporte.</p>
+        </div>
       </div>
     );
   }
