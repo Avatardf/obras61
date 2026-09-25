@@ -17,6 +17,12 @@ from app.models.unidade import StatusUnidade, Unidade
 router = APIRouter(tags=["unidades"])
 DB = Depends(get_db)
 
+# Dados do comprador — existem só enquanto a unidade está em negociação
+CAMPOS_NEGOCIACAO = (
+    "cliente_nome", "valor_venda", "data_venda",
+    "subsidio", "fgts", "recurso_proprio", "valor_financiado",
+)
+
 
 # ── Schemas ────────────────────────────────────────────────────────────────────
 
@@ -31,11 +37,16 @@ class UnidadeResponse(BaseModel):
     area_total_m2: float | None
     fracao_ideal: float | None
     custo: float | None
+    valor_avaliacao: float | None
     preco_tabela: float | None
     status: str
     cliente_nome: str | None
     valor_venda: float | None
     data_venda: date | None
+    subsidio: float | None
+    fgts: float | None
+    recurso_proprio: float | None
+    valor_financiado: float | None
     observacao: str | None
     orientacao_solar: str | None
 
@@ -51,6 +62,7 @@ class UnidadeCreate(BaseModel):
     area_total_m2: float | None = None
     fracao_ideal: float | None = None
     custo: float | None = None
+    valor_avaliacao: float | None = None
     preco_tabela: float | None = None
     status: StatusUnidade = StatusUnidade.disponivel
     orientacao_solar: str | None = None
@@ -65,11 +77,16 @@ class UnidadeUpdate(BaseModel):
     area_total_m2: float | None = None
     fracao_ideal: float | None = None
     custo: float | None = None
+    valor_avaliacao: float | None = None
     preco_tabela: float | None = None
     status: StatusUnidade | None = None
     cliente_nome: str | None = None
     valor_venda: float | None = None
     data_venda: date | None = None
+    subsidio: float | None = None
+    fgts: float | None = None
+    recurso_proprio: float | None = None
+    valor_financiado: float | None = None
     observacao: str | None = None
     orientacao_solar: str | None = None
 
@@ -107,8 +124,8 @@ class UnidadeLoteItem(BaseModel):
     pavimento: int | None = None
     area_privativa_m2: float | None = None
     custo: float | None = None
+    valor_avaliacao: float | None = None
     preco_tabela: float | None = None
-    valor_venda: float | None = None
     orientacao_solar: str | None = None
 
 
@@ -309,7 +326,9 @@ async def salvar_lote_unidades(emp_id: uuid.UUID, body: SalvarLote, db: AsyncSes
             await db.delete(u)
 
     campos = ("grupo", "identificador", "tipo", "pavimento", "area_privativa_m2",
-              "custo", "preco_tabela", "valor_venda", "orientacao_solar")
+              "custo", "valor_avaliacao", "preco_tabela", "orientacao_solar")
+    # Obs: dados da negociação (cliente, valor negociado, composição) não são
+    # tocados pelo cadastro em lote — só pelo bloco de negociação.
     resultado: list[Unidade] = []
     for item in body.unidades:
         if item.id is not None and item.id in por_id:
@@ -340,6 +359,10 @@ async def atualizar_unidade(uid: uuid.UUID, body: UnidadeUpdate, db: AsyncSessio
     # Ao marcar como vendido sem data, assume hoje
     if dados.get("status") == StatusUnidade.vendido and not u.data_venda and "data_venda" not in dados:
         dados["data_venda"] = date.today()
+    # Unidade volta ao estoque → os dados da negociação não ficam para trás
+    if dados.get("status") in (StatusUnidade.disponivel, StatusUnidade.indisponivel):
+        for c in CAMPOS_NEGOCIACAO:
+            dados[c] = None
     for campo, valor in dados.items():
         setattr(u, campo, valor)
     await db.commit()

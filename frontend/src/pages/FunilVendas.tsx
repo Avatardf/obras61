@@ -8,6 +8,8 @@ import {
   leadsApi, empreendimentosApi, unidadesApi,
   type Lead, type EtapaFunil, type FunilResponse,
 } from "@/api/client";
+import { CurrencyInput } from "@/components/ui/CurrencyInput";
+import { ConfirmacaoDesconto, abaixoDoValorDeVenda } from "@/components/vendas/ConfirmacaoDesconto";
 
 // ── Config das etapas (ordem + cor) ────────────────────────────────────────────
 
@@ -39,7 +41,8 @@ function LeadModal({ lead, onClose }: { lead?: Lead | null; onClose: () => void 
   const [empId, setEmpId] = useState(lead?.empreendimento_id ?? "");
   const [unidadeId, setUnidadeId] = useState(lead?.unidade_id ?? "");
   const [etapa, setEtapa] = useState<EtapaFunil>(lead?.etapa ?? "pre_atendimento");
-  const [valor, setValor] = useState(lead?.valor?.toString() ?? "");
+  const [valor, setValor] = useState<number | null>(lead?.valor != null ? Number(lead.valor) : null);
+  const [confirmandoDesconto, setConfirmandoDesconto] = useState(false);
   const [responsavel, setResponsavel] = useState(lead?.responsavel ?? "");
   const [origem, setOrigem] = useState(lead?.origem ?? "");
   const [obs, setObs] = useState(lead?.observacoes ?? "");
@@ -58,10 +61,13 @@ function LeadModal({ lead, onClose }: { lead?: Lead | null; onClose: () => void 
     enabled: !!empId,
   });
 
+  const unidadeSel = unidades.find(u => u.id === unidadeId);
+  const valorDeVenda = unidadeSel?.preco_tabela != null ? Number(unidadeSel.preco_tabela) : null;
+
   const payload = () => ({
     nome_cliente: nome, telefone: telefone || null, email: email || null,
     empreendimento_id: empId || null, unidade_id: unidadeId || null,
-    etapa, valor: valor ? Number(valor) : null,
+    etapa, valor,
     responsavel: responsavel || null, origem: origem || null,
     observacoes: obs || null, motivo_perda: etapa === "perdido" ? (motivoPerda || null) : null,
   });
@@ -84,6 +90,14 @@ function LeadModal({ lead, onClose }: { lead?: Lead | null; onClose: () => void 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      {confirmandoDesconto && valor != null && valorDeVenda != null && (
+        <ConfirmacaoDesconto
+          valorVenda={valorDeVenda}
+          valorNegociado={valor}
+          onRevisar={() => setConfirmandoDesconto(false)}
+          onConfirmar={() => { setConfirmandoDesconto(false); salvar.mutate(); }}
+        />
+      )}
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[92vh] overflow-y-auto">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 sticky top-0 bg-white">
           <h2 className="text-base font-semibold text-slate-800">{isEdicao ? "Editar lead" : "Novo lead"}</h2>
@@ -145,10 +159,9 @@ function LeadModal({ lead, onClose }: { lead?: Lead | null; onClose: () => void 
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1.5">Valor (R$)</label>
-              <input type="number" value={valor} onChange={e => setValor(e.target.value)} className={inputClass} placeholder="350000" />
-            </div>
+            <CurrencyInput label="Valor negociado" nullable small value={valor} onChange={setValor}
+              placeholder="Ex: 345.000,00"
+              dica={valorDeVenda ? `Valor de venda: ${fmt(valorDeVenda)}` : undefined} />
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1.5">Origem</label>
               <select value={origem} onChange={e => setOrigem(e.target.value)} className={clsx(inputClass, "bg-white")}>
@@ -174,7 +187,12 @@ function LeadModal({ lead, onClose }: { lead?: Lead | null; onClose: () => void 
                 className="p-2.5 rounded-lg text-red-500 border border-red-200 hover:bg-red-50" title="Excluir lead"><Trash2 size={16} /></button>
             )}
             <button onClick={onClose} className="flex-1 px-4 py-2.5 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">Cancelar</button>
-            <button onClick={() => { setErro(""); if (!nome.trim()) { setErro("Informe o cliente"); return; } salvar.mutate(); }}
+            <button onClick={() => {
+                setErro("");
+                if (!nome.trim()) { setErro("Informe o cliente"); return; }
+                if (abaixoDoValorDeVenda(valor, valorDeVenda)) { setConfirmandoDesconto(true); return; }
+                salvar.mutate();
+              }}
               disabled={salvar.isPending}
               className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 disabled:opacity-60 flex items-center justify-center gap-2">
               {salvar.isPending && <Loader2 size={14} className="animate-spin" />} Salvar

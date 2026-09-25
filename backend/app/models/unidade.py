@@ -44,7 +44,8 @@ class Unidade(Base, TenantMixin, TimestampMixin):
     area_total_m2: Mapped[float | None] = mapped_column(NUMERIC(10, 2), nullable=True)
     fracao_ideal: Mapped[float | None] = mapped_column(NUMERIC(8, 6), nullable=True)
     custo: Mapped[float | None] = mapped_column(NUMERIC(15, 2), nullable=True)         # custo de produção da unidade
-    preco_tabela: Mapped[float | None] = mapped_column(NUMERIC(15, 2), nullable=True)  # preço de tabela/anúncio
+    valor_avaliacao: Mapped[float | None] = mapped_column(NUMERIC(15, 2), nullable=True)  # avaliação do banco (ex: Caixa)
+    preco_tabela: Mapped[float | None] = mapped_column(NUMERIC(15, 2), nullable=True)  # "Valor de Venda" na tela
 
     status: Mapped[StatusUnidade] = mapped_column(
         Enum(StatusUnidade, native_enum=False), default=StatusUnidade.disponivel, index=True
@@ -52,8 +53,14 @@ class Unidade(Base, TenantMixin, TimestampMixin):
 
     # Dados da venda — preenchidos quando reservado/vendido
     cliente_nome: Mapped[str | None] = mapped_column(String(200), nullable=True)
-    valor_venda: Mapped[float | None] = mapped_column(NUMERIC(15, 2), nullable=True)
+    valor_venda: Mapped[float | None] = mapped_column(NUMERIC(15, 2), nullable=True)  # "Valor negociado" na tela
     data_venda: Mapped[date | None] = mapped_column(DATE, nullable=True)
+
+    # Composição de pagamento do comprador (bloco de negociação)
+    subsidio: Mapped[float | None] = mapped_column(NUMERIC(15, 2), nullable=True)
+    fgts: Mapped[float | None] = mapped_column(NUMERIC(15, 2), nullable=True)
+    recurso_proprio: Mapped[float | None] = mapped_column(NUMERIC(15, 2), nullable=True)
+    valor_financiado: Mapped[float | None] = mapped_column(NUMERIC(15, 2), nullable=True)
 
     observacao: Mapped[str | None] = mapped_column(Text, nullable=True)
     orientacao_solar: Mapped[str | None] = mapped_column(String(20), nullable=True)  # nascente, poente, ambas

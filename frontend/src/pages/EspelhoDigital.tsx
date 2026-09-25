@@ -9,6 +9,8 @@ import {
   empreendimentosApi, unidadesApi,
   type Unidade, type StatusUnidade, type ResumoEspelho,
 } from "@/api/client";
+import { CurrencyInput } from "@/components/ui/CurrencyInput";
+import { ConfirmacaoDesconto, abaixoDoValorDeVenda } from "@/components/vendas/ConfirmacaoDesconto";
 
 // ── Config de status (cores alinhadas ao espelho digital) ──────────────────────
 
@@ -31,35 +33,58 @@ const inputClass = "w-full px-3 py-2 text-sm border border-slate-200 rounded-lg 
 
 // ── Modal de edição de unidade ─────────────────────────────────────────────────
 
+const num = (v: number | null | undefined) => (v == null ? null : Number(v));
+
 function UnidadeModal({ unidade, onClose }: { unidade: Unidade; onClose: () => void }) {
   const qc = useQueryClient();
   const [status, setStatus] = useState<StatusUnidade>(unidade.status);
-  const [custo, setCusto] = useState(unidade.custo?.toString() ?? "");
-  const [precoTabela, setPrecoTabela] = useState(unidade.preco_tabela?.toString() ?? "");
-  const [area, setArea] = useState(unidade.area_privativa_m2?.toString() ?? "");
-  const [cliente, setCliente] = useState(unidade.cliente_nome ?? "");
-  const [valorVenda, setValorVenda] = useState(unidade.valor_venda?.toString() ?? "");
-  const [obs, setObs] = useState(unidade.observacao ?? "");
+  const [custo, setCusto] = useState<number | null>(num(unidade.custo));
+  const [avaliacao, setAvaliacao] = useState<number | null>(num(unidade.valor_avaliacao));
+  const [valorDeVenda, setValorDeVenda] = useState<number | null>(num(unidade.preco_tabela));
+  const [area, setArea] = useState(unidade.area_privativa_m2?.toString().replace(".", ",") ?? "");
   const [orientacao, setOrientacao] = useState(unidade.orientacao_solar ?? "");
+  const [obs, setObs] = useState(unidade.observacao ?? "");
+  // Bloco de negociação
+  const [cliente, setCliente] = useState(unidade.cliente_nome ?? "");
+  const [negociado, setNegociado] = useState<number | null>(num(unidade.valor_venda));
+  const [subsidio, setSubsidio] = useState<number | null>(num(unidade.subsidio));
+  const [fgts, setFgts] = useState<number | null>(num(unidade.fgts));
+  const [recursoProprio, setRecursoProprio] = useState<number | null>(num(unidade.recurso_proprio));
+  const [financiado, setFinanciado] = useState<number | null>(num(unidade.valor_financiado));
+  const [confirmandoDesconto, setConfirmandoDesconto] = useState(false);
+  const [erro, setErro] = useState("");
 
   const mostraVenda = status === "vendido" || status === "reservado" || status === "pre_reserva";
+
+  // Composição de pagamento: a soma deve fechar o valor negociado
+  const temComposicao = [subsidio, fgts, recursoProprio, financiado].some(v => v != null && v > 0);
+  const somaComposicao = (subsidio ?? 0) + (fgts ?? 0) + (recursoProprio ?? 0) + (financiado ?? 0);
+  const diferenca = (negociado ?? 0) - somaComposicao;
+  const fechou = Math.abs(diferenca) < 0.01;
+  const entradaSugerida = (negociado ?? 0) - (subsidio ?? 0) - (fgts ?? 0) - (financiado ?? 0);
 
   const salvar = useMutation({
     mutationFn: () => unidadesApi.atualizar(unidade.id, {
       status,
-      custo: custo ? Number(custo) : null,
-      preco_tabela: precoTabela ? Number(precoTabela) : null,
-      area_privativa_m2: area ? Number(area) : null,
-      cliente_nome: mostraVenda ? (cliente || null) : null,
-      valor_venda: mostraVenda && valorVenda ? Number(valorVenda) : null,
+      custo,
+      valor_avaliacao: avaliacao,
+      preco_tabela: valorDeVenda,
+      area_privativa_m2: area ? Number(area.replace(/\./g, "").replace(",", ".")) : null,
       observacao: obs || null,
       orientacao_solar: orientacao || null,
+      cliente_nome: mostraVenda ? (cliente || null) : null,
+      valor_venda: mostraVenda ? negociado : null,
+      subsidio: mostraVenda ? subsidio : null,
+      fgts: mostraVenda ? fgts : null,
+      recurso_proprio: mostraVenda ? recursoProprio : null,
+      valor_financiado: mostraVenda ? financiado : null,
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["unidades"] });
       qc.invalidateQueries({ queryKey: ["espelho-resumo"] });
       onClose();
     },
+    onError: (e: any) => setErro(e?.response?.data?.detail ?? "Erro ao salvar a unidade"),
   });
 
   const excluir = useMutation({
@@ -69,10 +94,28 @@ function UnidadeModal({ unidade, onClose }: { unidade: Unidade; onClose: () => v
       qc.invalidateQueries({ queryKey: ["espelho-resumo"] });
       onClose();
     },
+    onError: (e: any) => setErro(e?.response?.data?.detail ?? "Erro ao excluir a unidade"),
   });
+
+  function tentarSalvar() {
+    setErro("");
+    if (mostraVenda && abaixoDoValorDeVenda(negociado, valorDeVenda)) {
+      setConfirmandoDesconto(true);
+      return;
+    }
+    salvar.mutate();
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      {confirmandoDesconto && negociado != null && valorDeVenda != null && (
+        <ConfirmacaoDesconto
+          valorVenda={valorDeVenda}
+          valorNegociado={negociado}
+          onRevisar={() => setConfirmandoDesconto(false)}
+          onConfirmar={() => { setConfirmandoDesconto(false); salvar.mutate(); }}
+        />
+      )}
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
           <h2 className="text-base font-semibold text-slate-800">
@@ -101,17 +144,13 @@ function UnidadeModal({ unidade, onClose }: { unidade: Unidade; onClose: () => v
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1.5">Custo (R$)</label>
-              <input type="number" value={custo} onChange={e => setCusto(e.target.value)} className={inputClass} placeholder="220000" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1.5">Preço de tabela (R$)</label>
-              <input type="number" value={precoTabela} onChange={e => setPrecoTabela(e.target.value)} className={inputClass} placeholder="350000" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1.5">Área privativa (m²)</label>
-              <input type="number" value={area} onChange={e => setArea(e.target.value)} className={inputClass} placeholder="48" />
+            <CurrencyInput label="Custo" nullable small value={custo} onChange={setCusto} placeholder="Ex: 220.000,00" />
+            <CurrencyInput label="Valor de Avaliação" nullable small value={avaliacao} onChange={setAvaliacao} placeholder="Ex: 330.000,00" />
+            <CurrencyInput label="Valor de Venda" nullable small value={valorDeVenda} onChange={setValorDeVenda} placeholder="Ex: 350.000,00" />
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-slate-700">Área privativa (m²)</label>
+              <input value={area} onChange={e => setArea(e.target.value.replace(/[^\d,]/g, ""))}
+                inputMode="decimal" className={inputClass} placeholder="Ex: 48,50" />
             </div>
           </div>
 
@@ -130,9 +169,38 @@ function UnidadeModal({ unidade, onClose }: { unidade: Unidade; onClose: () => v
                 <label className="block text-xs font-medium text-slate-600 mb-1.5">Cliente</label>
                 <input value={cliente} onChange={e => setCliente(e.target.value)} className={inputClass} placeholder="Nome do comprador" />
               </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1.5">Valor da venda (R$)</label>
-                <input type="number" value={valorVenda} onChange={e => setValorVenda(e.target.value)} className={inputClass} placeholder="350000" />
+              <CurrencyInput label="Valor negociado" nullable small value={negociado} onChange={setNegociado}
+                placeholder="Ex: 345.000,00"
+                dica={valorDeVenda ? `Valor de venda: ${fmt(valorDeVenda)}` : undefined} />
+
+              <div className="pt-2 border-t border-slate-200">
+                <p className="text-xs font-semibold text-slate-600 mb-2">Composição do pagamento</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <CurrencyInput label="Subsídio" nullable small value={subsidio} onChange={setSubsidio} />
+                  <CurrencyInput label="FGTS" nullable small value={fgts} onChange={setFgts} />
+                  <CurrencyInput label="Recurso Próprio / Entrada" nullable small value={recursoProprio} onChange={setRecursoProprio} />
+                  <CurrencyInput label="Valor Financiado" nullable small value={financiado} onChange={setFinanciado} />
+                </div>
+                {temComposicao && (
+                  <div className={clsx(
+                    "mt-2 rounded-lg px-3 py-2 text-xs flex items-center justify-between gap-2",
+                    fechou ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-800",
+                  )}>
+                    <span>
+                      Soma: <strong className="tabular-nums">{fmt(somaComposicao)}</strong>
+                      {negociado != null && !fechou && (
+                        <> · {diferenca > 0 ? "faltam" : "excede em"} <strong className="tabular-nums">{fmt(Math.abs(diferenca))}</strong></>
+                      )}
+                      {negociado != null && fechou && " · fecha o valor negociado"}
+                    </span>
+                    {negociado != null && !fechou && entradaSugerida >= 0 && (
+                      <button onClick={() => setRecursoProprio(Math.round(entradaSugerida * 100) / 100)}
+                        className="shrink-0 font-semibold underline hover:no-underline">
+                        Ajustar entrada
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -142,6 +210,10 @@ function UnidadeModal({ unidade, onClose }: { unidade: Unidade; onClose: () => v
             <input value={obs} onChange={e => setObs(e.target.value)} className={inputClass} placeholder="Opcional" />
           </div>
 
+          {erro && (
+            <div className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{erro}</div>
+          )}
+
           <div className="flex gap-2 pt-1">
             <button onClick={() => excluir.mutate()} disabled={excluir.isPending}
               className="p-2.5 rounded-lg text-red-500 border border-red-200 hover:bg-red-50" title="Excluir unidade">
@@ -150,7 +222,7 @@ function UnidadeModal({ unidade, onClose }: { unidade: Unidade; onClose: () => v
             <button onClick={onClose} className="flex-1 px-4 py-2.5 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">
               Cancelar
             </button>
-            <button onClick={() => salvar.mutate()} disabled={salvar.isPending}
+            <button onClick={tentarSalvar} disabled={salvar.isPending}
               className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 disabled:opacity-60 flex items-center justify-center gap-2">
               {salvar.isPending && <Loader2 size={14} className="animate-spin" />}
               Salvar
@@ -262,7 +334,7 @@ export function EspelhoDigital() {
                   {empAtual?.num_pavimentos_estimado != null && (
                     <p className="text-xs text-slate-500">Andares: <strong className="text-slate-700">{empAtual.num_pavimentos_estimado}</strong></p>
                   )}
-                  <p className="text-xs text-slate-500">VGV tabela: <strong className="text-slate-700">{fmt(resumo.vgv_tabela)}</strong></p>
+                  <p className="text-xs text-slate-500">VGV (valor de venda): <strong className="text-slate-700">{fmt(resumo.vgv_tabela)}</strong></p>
                   <p className="text-xs text-slate-500">VGV vendido: <strong className="text-blue-700">{fmt(resumo.vgv_vendido)}</strong></p>
                   {resumo.vgv_tabela > 0 && (
                     <p className="text-xs text-slate-500">% vendido: <strong className="text-emerald-700">{Math.round((resumo.vgv_vendido / resumo.vgv_tabela) * 100)}%</strong></p>

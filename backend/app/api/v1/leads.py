@@ -209,6 +209,10 @@ async def atualizar_lead(lid: uuid.UUID, body: LeadUpdate, db: AsyncSession = DB
                 unidade.cliente_nome = None
                 unidade.valor_venda = None
                 unidade.data_venda = None
+                unidade.subsidio = None
+                unidade.fgts = None
+                unidade.recurso_proprio = None
+                unidade.valor_financiado = None
 
     await db.commit()
     await db.refresh(lead)

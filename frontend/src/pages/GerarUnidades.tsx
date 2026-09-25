@@ -7,6 +7,7 @@ import {
 import { clsx } from "clsx";
 import { empreendimentosApi, unidadesApi, type Unidade } from "@/api/client";
 import { ORIENTACOES } from "@/pages/EspelhoDigital";
+import { CurrencyInput } from "@/components/ui/CurrencyInput";
 
 const inputClass = "w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500";
 const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
@@ -19,8 +20,8 @@ interface Linha {
   pavimento: number | null;
   area_privativa_m2: number | null;
   custo: number | null;
-  preco_tabela: number | null;
-  valor_venda: number | null;
+  valor_avaliacao: number | null;
+  preco_tabela: number | null;   // Valor de Venda
   orientacao_solar: string;
   status: string;            // 'disponivel' pode ser removida; demais ficam travadas
 }
@@ -29,12 +30,12 @@ let _seq = 0;
 const fromUnidade = (u: Unidade): Linha => ({
   _key: ++_seq, id: u.id, grupo: u.grupo, identificador: u.identificador,
   pavimento: u.pavimento, area_privativa_m2: u.area_privativa_m2, custo: u.custo,
-  preco_tabela: u.preco_tabela, valor_venda: u.valor_venda,
+  valor_avaliacao: u.valor_avaliacao, preco_tabela: u.preco_tabela,
   orientacao_solar: u.orientacao_solar ?? "", status: u.status,
 });
 const novaLinha = (grupo: string, pavimento: number | null, identificador = ""): Linha => ({
   _key: ++_seq, id: null, grupo, identificador, pavimento,
-  area_privativa_m2: null, custo: null, preco_tabela: null, valor_venda: null,
+  area_privativa_m2: null, custo: null, valor_avaliacao: null, preco_tabela: null,
   orientacao_solar: "", status: "disponivel",
 });
 
@@ -115,7 +116,7 @@ export function GerarUnidades() {
 
   const totalCusto = linhas.reduce((s, l) => s + (l.custo ?? 0), 0);
   const totalTabela = linhas.reduce((s, l) => s + (l.preco_tabela ?? 0), 0);
-  const totalVenda = linhas.reduce((s, l) => s + (l.valor_venda ?? 0), 0);
+  const totalAvaliacao = linhas.reduce((s, l) => s + (l.valor_avaliacao ?? 0), 0);
   const totalArea = linhas.reduce((s, l) => s + (l.area_privativa_m2 ?? 0), 0);
 
   const salvar = useMutation({
@@ -126,8 +127,8 @@ export function GerarUnidades() {
       pavimento: l.pavimento,
       area_privativa_m2: l.area_privativa_m2,
       custo: l.custo,
+      valor_avaliacao: l.valor_avaliacao,
       preco_tabela: l.preco_tabela,
-      valor_venda: l.valor_venda,
       orientacao_solar: l.orientacao_solar || null,
     }))),
     onSuccess: () => {
@@ -177,9 +178,9 @@ export function GerarUnidades() {
               <th className="py-2 pr-2">Área</th>
               <th className="py-2 pr-2">Orientação</th>
               <th className="py-2 pr-2 text-right">Custo</th>
-              <th className="py-2 pr-2 text-right">Tabela</th>
-              <th className="py-2 pr-2 text-right">Venda</th>
-              <th className="py-2 pr-2 text-right">Margem (tabela)</th>
+              <th className="py-2 pr-2 text-right">Avaliação</th>
+              <th className="py-2 pr-2 text-right">Valor de Venda</th>
+              <th className="py-2 pr-2 text-right">Margem</th>
             </tr>
           </thead>
           <tbody>
@@ -192,8 +193,8 @@ export function GerarUnidades() {
                   <td className="py-1.5 pr-2 text-slate-500">{l.area_privativa_m2 ? `${l.area_privativa_m2} m²` : "—"}</td>
                   <td className="py-1.5 pr-2 text-slate-500">{l.orientacao_solar ? ORIENTACOES[l.orientacao_solar] : "—"}</td>
                   <td className="py-1.5 pr-2 text-right text-slate-500">{l.custo ? fmt(l.custo) : "—"}</td>
+                  <td className="py-1.5 pr-2 text-right text-slate-500">{l.valor_avaliacao ? fmt(l.valor_avaliacao) : "—"}</td>
                   <td className="py-1.5 pr-2 text-right text-slate-700">{l.preco_tabela ? fmt(l.preco_tabela) : "—"}</td>
-                  <td className="py-1.5 pr-2 text-right text-blue-700">{l.valor_venda ? fmt(l.valor_venda) : "—"}</td>
                   <td className={clsx("py-1.5 pr-2 text-right", m >= 0 ? "text-emerald-700" : "text-red-600")}>
                     {(l.preco_tabela || l.custo) ? fmt(m) : "—"}
                   </td>
@@ -207,8 +208,8 @@ export function GerarUnidades() {
               <td className="py-2 pr-2">{totalArea ? `${totalArea.toFixed(0)} m²` : "—"}</td>
               <td></td>
               <td className="py-2 pr-2 text-right">{totalCusto ? fmt(totalCusto) : "—"}</td>
+              <td className="py-2 pr-2 text-right">{totalAvaliacao ? fmt(totalAvaliacao) : "—"}</td>
               <td className="py-2 pr-2 text-right">{totalTabela ? fmt(totalTabela) : "—"}</td>
-              <td className="py-2 pr-2 text-right">{totalVenda ? fmt(totalVenda) : "—"}</td>
               <td className="py-2 pr-2 text-right text-emerald-700">{(totalTabela - totalCusto) ? fmt(totalTabela - totalCusto) : "—"}</td>
             </tr>
           </tfoot>
@@ -258,7 +259,7 @@ export function GerarUnidades() {
         </div>
 
         <div className="overflow-x-auto -mx-1">
-          <table className="w-full text-sm min-w-[920px]">
+          <table className="w-full text-sm min-w-[1000px]">
             <thead>
               <tr className="text-left text-xs font-medium text-slate-500">
                 <th className="px-1 py-1.5">Grupo</th>
@@ -266,8 +267,8 @@ export function GerarUnidades() {
                 <th className="px-1 py-1.5">Andar</th>
                 <th className="px-1 py-1.5">Área (m²)</th>
                 <th className="px-1 py-1.5">Custo (R$)</th>
-                <th className="px-1 py-1.5">Tabela (R$)</th>
-                <th className="px-1 py-1.5">Venda (R$)</th>
+                <th className="px-1 py-1.5">Avaliação (R$)</th>
+                <th className="px-1 py-1.5">Valor de Venda (R$)</th>
                 <th className="px-1 py-1.5">Orientação</th>
                 <th className="px-1 py-1.5"></th>
               </tr>
@@ -297,13 +298,13 @@ export function GerarUnidades() {
                       <input type="number" value={l.area_privativa_m2 ?? ""} onChange={e => set(l._key, "area_privativa_m2", e.target.value ? Number(e.target.value) : null)} className={clsx(inputClass, "w-20")} placeholder="48" />
                     </td>
                     <td className="px-1 py-1.5">
-                      <input type="number" value={l.custo ?? ""} onChange={e => set(l._key, "custo", e.target.value ? Number(e.target.value) : null)} className={clsx(inputClass, "w-28")} placeholder="220000" />
+                      <CurrencyInput bare small nullable value={l.custo} onChange={v => set(l._key, "custo", v)} className="w-36" />
                     </td>
                     <td className="px-1 py-1.5">
-                      <input type="number" value={l.preco_tabela ?? ""} onChange={e => set(l._key, "preco_tabela", e.target.value ? Number(e.target.value) : null)} className={clsx(inputClass, "w-28")} placeholder="350000" />
+                      <CurrencyInput bare small nullable value={l.valor_avaliacao} onChange={v => set(l._key, "valor_avaliacao", v)} className="w-36" />
                     </td>
                     <td className="px-1 py-1.5">
-                      <input type="number" value={l.valor_venda ?? ""} onChange={e => set(l._key, "valor_venda", e.target.value ? Number(e.target.value) : null)} className={clsx(inputClass, "w-28")} placeholder="—" />
+                      <CurrencyInput bare small nullable value={l.preco_tabela} onChange={v => set(l._key, "preco_tabela", v)} className="w-36" />
                     </td>
                     <td className="px-1 py-1.5">
                       <select value={l.orientacao_solar} onChange={e => set(l._key, "orientacao_solar", e.target.value)} className={clsx(inputClass, "bg-white w-32")}>

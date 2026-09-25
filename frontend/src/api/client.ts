@@ -514,11 +514,16 @@ export interface Unidade {
   area_total_m2: number | null;
   fracao_ideal: number | null;
   custo: number | null;
-  preco_tabela: number | null;
+  valor_avaliacao: number | null;
+  preco_tabela: number | null;      // "Valor de Venda" na tela
   status: StatusUnidade;
   cliente_nome: string | null;
-  valor_venda: number | null;
+  valor_venda: number | null;       // "Valor negociado" na tela
   data_venda: string | null;
+  subsidio: number | null;
+  fgts: number | null;
+  recurso_proprio: number | null;
+  valor_financiado: number | null;
   observacao: string | null;
   orientacao_solar: string | null;
 }
@@ -541,8 +546,8 @@ export interface UnidadeLoteItem {
   pavimento?: number | null;
   area_privativa_m2?: number | null;
   custo?: number | null;
+  valor_avaliacao?: number | null;
   preco_tabela?: number | null;
-  valor_venda?: number | null;
   orientacao_solar?: string | null;
 }
 
