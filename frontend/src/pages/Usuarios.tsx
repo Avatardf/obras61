@@ -11,7 +11,7 @@ import { useAuthStore } from "@/stores/authStore";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-const PAPEIS: Papel[] = ["admin", "engenheiro", "mestre", "comprador", "financeiro", "viewer"];
+const PAPEIS: Papel[] = ["admin", "engenheiro", "mestre", "comprador", "financeiro", "corretor", "viewer"];
 
 function PapelBadge({ papel }: { papel: string }) {
   const cor = PAPEL_CORES[papel as Papel] ?? "bg-slate-100 text-slate-600";

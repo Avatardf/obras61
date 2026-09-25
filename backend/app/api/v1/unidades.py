@@ -10,8 +10,9 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import CurrentUser
+from app.dependencies import CurrentUser, NaoCorretor, is_corretor
 from app.models.obra import Empreendimento
+from app.models.tenant import User
 from app.models.unidade import StatusUnidade, Unidade
 
 router = APIRouter(tags=["unidades"])
@@ -22,6 +23,12 @@ CAMPOS_NEGOCIACAO = (
     "cliente_nome", "valor_venda", "data_venda",
     "subsidio", "fgts", "recurso_proprio", "valor_financiado",
 )
+# Status em que a unidade tem um corretor "dono" da negociação
+EM_NEGOCIACAO = (StatusUnidade.pre_reserva, StatusUnidade.reservado, StatusUnidade.vendido)
+# O que um corretor pode alterar numa unidade (o resto é do admin)
+EDITAVEIS_CORRETOR = {"status", "observacao", *CAMPOS_NEGOCIACAO}
+# Campos que o corretor não enxerga
+OCULTOS_CORRETOR = ("custo", "valor_avaliacao")
 
 
 # ── Schemas ────────────────────────────────────────────────────────────────────
@@ -49,6 +56,8 @@ class UnidadeResponse(BaseModel):
     valor_financiado: float | None
     observacao: str | None
     orientacao_solar: str | None
+    corretor_id: uuid.UUID | None = None
+    corretor_nome: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -89,6 +98,7 @@ class UnidadeUpdate(BaseModel):
     valor_financiado: float | None = None
     observacao: str | None = None
     orientacao_solar: str | None = None
+    corretor_id: uuid.UUID | None = None      # só admin/interno: transfere a negociação
 
 
 class GerarUnidades(BaseModel):
@@ -156,6 +166,31 @@ async def _unidade(db: AsyncSession, uid: uuid.UUID, tenant_id) -> Unidade:
     return u
 
 
+async def _nomes_usuarios(db: AsyncSession, ids) -> dict:
+    ids = {i for i in ids if i}
+    if not ids:
+        return {}
+    rows = (await db.execute(select(User.id, User.nome).where(User.id.in_(ids)))).all()
+    return {r.id: r.nome for r in rows}
+
+
+def _serializar(u: Unidade, user: User, nomes: dict) -> UnidadeResponse:
+    """Monta a resposta escondendo o que o papel do usuário não pode ver.
+
+    Corretor: nunca vê custo nem avaliação; dados do comprador só nas
+    unidades que ele mesmo está negociando.
+    """
+    r = UnidadeResponse.model_validate(u)
+    r.corretor_nome = nomes.get(u.corretor_id)
+    if is_corretor(user):
+        for c in OCULTOS_CORRETOR:
+            setattr(r, c, None)
+        if u.corretor_id != user.id:
+            for c in CAMPOS_NEGOCIACAO:
+                setattr(r, c, None)
+    return r
+
+
 async def _contar_unidades(db: AsyncSession, emp_id: uuid.UUID) -> int:
     return (await db.execute(
         select(func.count(Unidade.id)).where(Unidade.empreendimento_id == emp_id)
@@ -182,7 +217,9 @@ async def listar_unidades(emp_id: uuid.UUID, db: AsyncSession = DB, user: Curren
         .where(Unidade.empreendimento_id == emp_id, Unidade.tenant_id == user.tenant_id)
         .order_by(Unidade.grupo, Unidade.identificador)
     )
-    return (await db.execute(stmt)).scalars().all()
+    unidades = (await db.execute(stmt)).scalars().all()
+    nomes = await _nomes_usuarios(db, [u.corretor_id for u in unidades])
+    return [_serializar(u, user, nomes) for u in unidades]
 
 
 @router.get("/empreendimentos/{emp_id}/unidades/resumo", response_model=ResumoEspelho)
@@ -208,7 +245,7 @@ async def resumo_espelho(emp_id: uuid.UUID, db: AsyncSession = DB, user: Current
 
 
 @router.post("/empreendimentos/{emp_id}/unidades", response_model=UnidadeResponse, status_code=status.HTTP_201_CREATED)
-async def criar_unidade(emp_id: uuid.UUID, body: UnidadeCreate, db: AsyncSession = DB, user: CurrentUser = None):
+async def criar_unidade(emp_id: uuid.UUID, body: UnidadeCreate, db: AsyncSession = DB, user: NaoCorretor = None):
     emp = await _empreendimento(db, emp_id, user.tenant_id)
     await _assert_capacidade(db, emp, await _contar_unidades(db, emp_id) + 1)
     u = Unidade(id=uuid.uuid4(), tenant_id=user.tenant_id, empreendimento_id=emp_id, **body.model_dump())
@@ -219,7 +256,7 @@ async def criar_unidade(emp_id: uuid.UUID, body: UnidadeCreate, db: AsyncSession
 
 
 @router.post("/empreendimentos/{emp_id}/unidades/gerar", response_model=list[UnidadeResponse], status_code=status.HTTP_201_CREATED)
-async def gerar_unidades(emp_id: uuid.UUID, body: GerarUnidades, db: AsyncSession = DB, user: CurrentUser = None):
+async def gerar_unidades(emp_id: uuid.UUID, body: GerarUnidades, db: AsyncSession = DB, user: NaoCorretor = None):
     """Gera N unidades sequenciais de um grupo (ex: Quadra 1, lotes 1..20)."""
     emp = await _empreendimento(db, emp_id, user.tenant_id)
     # Evita duplicar identificadores já existentes no mesmo grupo
@@ -250,7 +287,7 @@ async def gerar_unidades(emp_id: uuid.UUID, body: GerarUnidades, db: AsyncSessio
 
 
 @router.post("/empreendimentos/{emp_id}/unidades/gerar-por-andar", response_model=list[UnidadeResponse], status_code=status.HTTP_201_CREATED)
-async def gerar_unidades_por_andar(emp_id: uuid.UUID, body: GerarPorAndar, db: AsyncSession = DB, user: CurrentUser = None):
+async def gerar_unidades_por_andar(emp_id: uuid.UUID, body: GerarPorAndar, db: AsyncSession = DB, user: NaoCorretor = None):
     """Gera unidades em lote, andar a andar — cada andar pode ter quantidade,
     área, preço e orientação solar diferentes (ex: 101-104, 201-204, 301-302)."""
     emp = await _empreendimento(db, emp_id, user.tenant_id)
@@ -284,7 +321,7 @@ async def gerar_unidades_por_andar(emp_id: uuid.UUID, body: GerarPorAndar, db: A
 
 
 @router.put("/empreendimentos/{emp_id}/unidades/lote", response_model=list[UnidadeResponse])
-async def salvar_lote_unidades(emp_id: uuid.UUID, body: SalvarLote, db: AsyncSession = DB, user: CurrentUser = None):
+async def salvar_lote_unidades(emp_id: uuid.UUID, body: SalvarLote, db: AsyncSession = DB, user: NaoCorretor = None):
     """Salva a lista completa de unidades do empreendimento (cadastro manual).
 
     Reconcilia o estado: itens com `id` são atualizados, sem `id` são criados,
@@ -354,24 +391,57 @@ async def salvar_lote_unidades(emp_id: uuid.UUID, body: SalvarLote, db: AsyncSes
 
 @router.patch("/unidades/{uid}", response_model=UnidadeResponse)
 async def atualizar_unidade(uid: uuid.UUID, body: UnidadeUpdate, db: AsyncSession = DB, user: CurrentUser = None):
-    u = await _unidade(db, uid, user.tenant_id)
+    # FOR UPDATE: se dois corretores tentam reservar a mesma unidade ao mesmo
+    # tempo, o segundo espera o primeiro e já enxerga a reserva dele.
+    u = await db.get(Unidade, uid, with_for_update=True)
+    if not u or u.tenant_id != user.tenant_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Unidade não encontrada")
     dados = body.model_dump(exclude_unset=True)
+    novo_status = dados.get("status", u.status)
+
+    if is_corretor(user):
+        proibidos = sorted(set(dados) - EDITAVEIS_CORRETOR)
+        if proibidos:
+            raise HTTPException(status.HTTP_403_FORBIDDEN,
+                                f"Corretores não podem alterar: {', '.join(proibidos)}.")
+        if u.corretor_id is not None and u.corretor_id != user.id:
+            nome = (await _nomes_usuarios(db, [u.corretor_id])).get(u.corretor_id, "outro corretor")
+            raise HTTPException(status.HTTP_403_FORBIDDEN,
+                                f"Esta unidade está em negociação com {nome}. "
+                                f"Só ele(a) ou um administrador pode alterá-la.")
+        if u.corretor_id is None and u.status != StatusUnidade.disponivel:
+            raise HTTPException(status.HTTP_403_FORBIDDEN,
+                                f"Esta unidade está '{u.status}'. Só um administrador pode alterá-la.")
+        if novo_status not in (StatusUnidade.disponivel, *EM_NEGOCIACAO):
+            raise HTTPException(status.HTTP_403_FORBIDDEN,
+                                "Corretores não podem marcar unidades como permuta ou indisponível.")
+    elif dados.get("corretor_id") is not None:
+        alvo = await db.get(User, dados["corretor_id"])
+        if not alvo or alvo.tenant_id != user.tenant_id:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Corretor inválido")
+
     # Ao marcar como vendido sem data, assume hoje
-    if dados.get("status") == StatusUnidade.vendido and not u.data_venda and "data_venda" not in dados:
+    if novo_status == StatusUnidade.vendido and not u.data_venda and "data_venda" not in dados:
         dados["data_venda"] = date.today()
-    # Unidade volta ao estoque → os dados da negociação não ficam para trás
-    if dados.get("status") in (StatusUnidade.disponivel, StatusUnidade.indisponivel):
+
+    if novo_status in (StatusUnidade.disponivel, StatusUnidade.indisponivel):
+        # Unidade volta ao estoque → dados do comprador e dono da negociação saem
         for c in CAMPOS_NEGOCIACAO:
             dados[c] = None
+        dados["corretor_id"] = None
+    elif novo_status in EM_NEGOCIACAO and u.corretor_id is None and dados.get("corretor_id") is None:
+        # Quem reserva vira o dono da negociação
+        dados["corretor_id"] = user.id
+
     for campo, valor in dados.items():
         setattr(u, campo, valor)
     await db.commit()
     await db.refresh(u)
-    return u
+    return _serializar(u, user, await _nomes_usuarios(db, [u.corretor_id]))
 
 
 @router.delete("/unidades/{uid}", status_code=status.HTTP_204_NO_CONTENT)
-async def excluir_unidade(uid: uuid.UUID, db: AsyncSession = DB, user: CurrentUser = None):
+async def excluir_unidade(uid: uuid.UUID, db: AsyncSession = DB, user: NaoCorretor = None):
     u = await _unidade(db, uid, user.tenant_id)
     await db.delete(u)
     await db.commit()

@@ -9,6 +9,7 @@ import {
   type Lead, type EtapaFunil, type FunilResponse,
 } from "@/api/client";
 import { CurrencyInput } from "@/components/ui/CurrencyInput";
+import { useAuthStore } from "@/stores/authStore";
 import { ConfirmacaoDesconto, abaixoDoValorDeVenda } from "@/components/vendas/ConfirmacaoDesconto";
 
 // ── Config das etapas (ordem + cor) ────────────────────────────────────────────
@@ -35,6 +36,9 @@ const inputClass = "w-full px-3 py-2 text-sm border border-slate-200 rounded-lg 
 function LeadModal({ lead, onClose }: { lead?: Lead | null; onClose: () => void }) {
   const qc = useQueryClient();
   const isEdicao = !!lead;
+  const papel = useAuthStore(s => s.user?.papel);
+  const meuId = useAuthStore(s => s.user?.id);
+  const isCorretor = papel === "corretor";
   const [nome, setNome] = useState(lead?.nome_cliente ?? "");
   const [telefone, setTelefone] = useState(lead?.telefone ?? "");
   const [email, setEmail] = useState(lead?.email ?? "");
@@ -43,7 +47,7 @@ function LeadModal({ lead, onClose }: { lead?: Lead | null; onClose: () => void 
   const [etapa, setEtapa] = useState<EtapaFunil>(lead?.etapa ?? "pre_atendimento");
   const [valor, setValor] = useState<number | null>(lead?.valor != null ? Number(lead.valor) : null);
   const [confirmandoDesconto, setConfirmandoDesconto] = useState(false);
-  const [responsavel, setResponsavel] = useState(lead?.responsavel ?? "");
+  const [responsavelId, setResponsavelId] = useState(lead?.responsavel_id ?? "");
   const [origem, setOrigem] = useState(lead?.origem ?? "");
   const [obs, setObs] = useState(lead?.observacoes ?? "");
   const [motivoPerda, setMotivoPerda] = useState(lead?.motivo_perda ?? "");
@@ -61,6 +65,19 @@ function LeadModal({ lead, onClose }: { lead?: Lead | null; onClose: () => void 
     enabled: !!empId,
   });
 
+  // Admin escolhe o corretor dono do lead; o corretor é sempre dono dos próprios
+  const { data: responsaveis = [] } = useQuery({
+    queryKey: ["leads-responsaveis"],
+    queryFn: () => leadsApi.responsaveis(),
+    enabled: !isCorretor,
+  });
+  const mudouResponsavel = responsavelId !== (lead?.responsavel_id ?? "");
+
+  // Corretor não pode pegar unidade que outro corretor está negociando
+  const unidadeLivreParaMim = (u: (typeof unidades)[number]) =>
+    !isCorretor || u.id === lead?.unidade_id || u.corretor_id === meuId
+    || (u.corretor_id == null && u.status === "disponivel");
+
   const unidadeSel = unidades.find(u => u.id === unidadeId);
   const valorDeVenda = unidadeSel?.preco_tabela != null ? Number(unidadeSel.preco_tabela) : null;
 
@@ -68,7 +85,8 @@ function LeadModal({ lead, onClose }: { lead?: Lead | null; onClose: () => void 
     nome_cliente: nome, telefone: telefone || null, email: email || null,
     empreendimento_id: empId || null, unidade_id: unidadeId || null,
     etapa, valor,
-    responsavel: responsavel || null, origem: origem || null,
+    ...(!isCorretor && mudouResponsavel ? { responsavel_id: responsavelId || null } : {}),
+    origem: origem || null,
     observacoes: obs || null, motivo_perda: etapa === "perdido" ? (motivoPerda || null) : null,
   });
 
@@ -146,12 +164,13 @@ function LeadModal({ lead, onClose }: { lead?: Lead | null; onClose: () => void 
               <select value={unidadeId} onChange={e => setUnidadeId(e.target.value)} disabled={!empId} className={clsx(inputClass, "bg-white disabled:opacity-50")}>
                 <option value="">— Nenhuma —</option>
                 {unidades.map(u => (
-                  <option key={u.id} value={u.id}>
+                  <option key={u.id} value={u.id} disabled={!unidadeLivreParaMim(u)}>
                     {u.grupo} · {u.identificador}
                     {u.pavimento != null ? ` · ${u.pavimento}º andar` : ""}
                     {u.area_privativa_m2 ? ` · ${u.area_privativa_m2}m²` : ""}
                     {u.preco_tabela ? ` · ${u.preco_tabela.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 })}` : ""}
                     {u.status !== "disponivel" ? ` · (${u.status})` : ""}
+                    {!unidadeLivreParaMim(u) ? " · em negociação com outro corretor" : ""}
                   </option>
                 ))}
               </select>
@@ -171,7 +190,15 @@ function LeadModal({ lead, onClose }: { lead?: Lead | null; onClose: () => void 
             </div>
           </div>
 
-          <input value={responsavel} onChange={e => setResponsavel(e.target.value)} className={inputClass} placeholder="Responsável (corretor)" />
+          {!isCorretor && (
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1.5">Corretor responsável</label>
+              <select value={responsavelId} onChange={e => setResponsavelId(e.target.value)} className={clsx(inputClass, "bg-white")}>
+                <option value="">{isEdicao ? (lead?.responsavel && !lead?.responsavel_id ? `${lead.responsavel} (texto antigo)` : "— Sem responsável —") : "— Eu —"}</option>
+                {responsaveis.map(r => <option key={r.id} value={r.id}>{r.nome}{r.papel === "admin" ? " (admin)" : ""}</option>)}
+              </select>
+            </div>
+          )}
           <input value={obs} onChange={e => setObs(e.target.value)} className={inputClass} placeholder="Observações" />
 
           {etapa === "contrato" && unidadeId && (
@@ -235,10 +262,18 @@ function LeadCard({ lead, onClick }: { lead: Lead; onClick: () => void }) {
 export function FunilVendas() {
   const [novo, setNovo] = useState(false);
   const [editando, setEditando] = useState<Lead | null>(null);
+  const isCorretor = useAuthStore(s => s.user?.papel) === "corretor";
+  const [filtroCorretor, setFiltroCorretor] = useState("");
 
   const { data: funil, isLoading, isError } = useQuery<FunilResponse>({
-    queryKey: ["funil"],
-    queryFn: () => leadsApi.funil(),
+    queryKey: ["funil", filtroCorretor],
+    queryFn: () => leadsApi.funil(filtroCorretor ? { responsavel_id: filtroCorretor } : undefined),
+  });
+
+  const { data: responsaveis = [] } = useQuery({
+    queryKey: ["leads-responsaveis"],
+    queryFn: () => leadsApi.responsaveis(),
+    enabled: !isCorretor,
   });
 
   return (
@@ -252,10 +287,17 @@ export function FunilVendas() {
           <div>
             <h1 className="text-xl font-bold text-slate-900">Funil de Vendas</h1>
             <p className="text-sm text-slate-500 mt-0.5">
-              {funil?.total_leads ?? 0} leads ativos
+              {funil?.total_leads ?? 0} {isCorretor ? "leads seus" : "leads ativos"}
             </p>
           </div>
           <div className="flex items-center gap-3">
+            {!isCorretor && responsaveis.length > 0 && (
+              <select value={filtroCorretor} onChange={e => setFiltroCorretor(e.target.value)}
+                className="px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/40">
+                <option value="">Todos os corretores</option>
+                {responsaveis.map(r => <option key={r.id} value={r.id}>{r.nome}</option>)}
+              </select>
+            )}
             {funil && (
               <div className="flex gap-4">
                 <div className="text-right">

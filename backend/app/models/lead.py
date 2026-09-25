@@ -45,7 +45,11 @@ class Lead(Base, TenantMixin, TimestampMixin):
         Enum(EtapaFunil, native_enum=False), default=EtapaFunil.pre_atendimento, index=True
     )
     valor: Mapped[float | None] = mapped_column(NUMERIC(15, 2), nullable=True)
-    responsavel: Mapped[str | None] = mapped_column(String(120))
+    responsavel: Mapped[str | None] = mapped_column(String(120))   # nome exibido (legado/denormalizado)
+    # Dono do lead — corretores só enxergam os próprios leads
+    responsavel_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     origem: Mapped[str | None] = mapped_column(String(40))   # site, indicacao, portal, whatsapp, telefone
     observacoes: Mapped[str | None] = mapped_column(Text)
 

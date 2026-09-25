@@ -8,16 +8,17 @@
  *  comprador   → suprimentos
  *  financeiro  → financeiro, orçamentos, suprimentos, obras
  *  viewer      → todos (somente leitura)
+ *  corretor    → espelho digital (coletivo) e funil de vendas (só os próprios leads)
  */
 
-export type Papel = "admin" | "engenheiro" | "mestre" | "comprador" | "financeiro" | "viewer";
+export type Papel = "admin" | "engenheiro" | "mestre" | "comprador" | "financeiro" | "viewer" | "corretor";
 
 /** Rota raiz → papéis que podem acessá-la */
 export const PERMISSOES: Record<string, Papel[]> = {
   "/":               ["admin","engenheiro","mestre","comprador","financeiro","viewer"],
   "/empreendimentos":["admin","engenheiro","mestre","financeiro","viewer"],
-  "/espelho":        ["admin","engenheiro","financeiro","viewer"],
-  "/funil":          ["admin","engenheiro","financeiro","viewer"],
+  "/espelho":        ["admin","engenheiro","financeiro","viewer","corretor"],
+  "/funil":          ["admin","engenheiro","financeiro","viewer","corretor"],
   "/obras":          ["admin","engenheiro","mestre","comprador","financeiro","viewer"],
   "/pipeline":       ["admin","engenheiro","viewer"],
   "/cronograma":     ["admin","engenheiro","mestre","viewer"],
@@ -44,6 +45,12 @@ export function podAcessar(papel: string | undefined, rota: string): boolean {
   return permitidos.includes(papel as Papel);
 }
 
+/** Primeira tela do papel após o login (quando o painel "/" não está liberado) */
+export function rotaInicial(papel: string | undefined): string {
+  if (papel === "corretor") return "/funil";
+  return "/";
+}
+
 /** Retorna true se o papel pode realizar ações de escrita (criar/editar/excluir) */
 export function podeEscrever(papel: string | undefined): boolean {
   return papel !== "viewer" && papel !== undefined;
@@ -57,6 +64,7 @@ export const PAPEL_LABELS: Record<Papel, string> = {
   comprador:  "Comprador",
   financeiro: "Financeiro",
   viewer:     "Visualizador",
+  corretor:   "Corretor",
 };
 
 /** Cor de badge por papel */
@@ -67,4 +75,5 @@ export const PAPEL_CORES: Record<Papel, string> = {
   comprador:  "bg-emerald-100 text-emerald-700",
   financeiro: "bg-green-100 text-green-700",
   viewer:     "bg-slate-100 text-slate-600",
+  corretor:   "bg-rose-100 text-rose-700",
 };

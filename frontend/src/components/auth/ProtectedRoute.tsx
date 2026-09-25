@@ -1,6 +1,6 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
-import { podAcessar } from "@/lib/permissoes";
+import { podAcessar, rotaInicial } from "@/lib/permissoes";
 import { ShieldOff } from "lucide-react";
 
 interface Props {
@@ -22,7 +22,13 @@ export function ProtectedRoute({ children, papeis }: Props) {
     return <AcessoNegado papel={user.papel} />;
   }
 
-  // 3. Verificação pela matriz de permissões global
+  // 3. Painel "/" não liberado para o papel → vai para a tela inicial dele
+  if (user && location.pathname === "/" && !podAcessar(user.papel, "/")) {
+    const destino = rotaInicial(user.papel);
+    if (destino !== "/") return <Navigate to={destino} replace />;
+  }
+
+  // 4. Verificação pela matriz de permissões global
   if (user && !podAcessar(user.papel, location.pathname)) {
     return <AcessoNegado papel={user.papel} />;
   }

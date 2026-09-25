@@ -21,6 +21,7 @@ class Papel(StrEnum):
     comprador = "comprador"
     financeiro = "financeiro"
     viewer = "viewer"
+    corretor = "corretor"
 
 
 class Tenant(Base, TimestampMixin):

@@ -526,6 +526,8 @@ export interface Unidade {
   valor_financiado: number | null;
   observacao: string | null;
   orientacao_solar: string | null;
+  corretor_id: string | null;       // quem está negociando a unidade
+  corretor_nome: string | null;
 }
 
 export interface AndarConfig {
@@ -597,6 +599,7 @@ export interface Lead {
   etapa: EtapaFunil;
   valor: number | null;
   responsavel: string | null;
+  responsavel_id: string | null;
   origem: string | null;
   observacoes: string | null;
   data_entrada_etapa: string;
@@ -619,8 +622,10 @@ export interface FunilResponse {
 }
 
 export const leadsApi = {
-  funil: (empreendimentoId?: string): Promise<FunilResponse> =>
-    api.get("/api/v1/leads/funil", { params: empreendimentoId ? { empreendimento_id: empreendimentoId } : {} }).then(r => r.data),
+  funil: (filtros?: { empreendimento_id?: string; responsavel_id?: string }): Promise<FunilResponse> =>
+    api.get("/api/v1/leads/funil", { params: filtros ?? {} }).then(r => r.data),
+  responsaveis: (): Promise<{ id: string; nome: string; papel: string }[]> =>
+    api.get("/api/v1/leads/responsaveis").then(r => r.data),
   criar: (data: Partial<Lead>): Promise<Lead> =>
     api.post("/api/v1/leads", data).then(r => r.data),
   atualizar: (id: string, data: Partial<Lead>): Promise<Lead> =>

@@ -2,14 +2,15 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import {
-  Building2, Plus, Layers, Loader2, X, Trash2,
+  Building2, Plus, Layers, Loader2, X, Trash2, Lock,
 } from "lucide-react";
 import { clsx } from "clsx";
 import {
-  empreendimentosApi, unidadesApi,
+  empreendimentosApi, unidadesApi, leadsApi,
   type Unidade, type StatusUnidade, type ResumoEspelho,
 } from "@/api/client";
 import { CurrencyInput } from "@/components/ui/CurrencyInput";
+import { useAuthStore } from "@/stores/authStore";
 import { ConfirmacaoDesconto, abaixoDoValorDeVenda } from "@/components/vendas/ConfirmacaoDesconto";
 
 // ── Config de status (cores alinhadas ao espelho digital) ──────────────────────
@@ -34,9 +35,19 @@ const inputClass = "w-full px-3 py-2 text-sm border border-slate-200 rounded-lg 
 // ── Modal de edição de unidade ─────────────────────────────────────────────────
 
 const num = (v: number | null | undefined) => (v == null ? null : Number(v));
+const STATUS_CORRETOR: StatusUnidade[] = ["disponivel", "pre_reserva", "reservado", "vendido"];
 
 function UnidadeModal({ unidade, onClose }: { unidade: Unidade; onClose: () => void }) {
   const qc = useQueryClient();
+  const papel = useAuthStore(s => s.user?.papel);
+  const meuId = useAuthStore(s => s.user?.id);
+  const isCorretor = papel === "corretor";
+  // Corretor só mexe em unidade livre ou que ele mesmo está negociando
+  const bloqueada = isCorretor && (
+    (unidade.corretor_id != null && unidade.corretor_id !== meuId) ||
+    (unidade.corretor_id == null && unidade.status !== "disponivel")
+  );
+
   const [status, setStatus] = useState<StatusUnidade>(unidade.status);
   const [custo, setCusto] = useState<number | null>(num(unidade.custo));
   const [avaliacao, setAvaliacao] = useState<number | null>(num(unidade.valor_avaliacao));
@@ -51,10 +62,18 @@ function UnidadeModal({ unidade, onClose }: { unidade: Unidade; onClose: () => v
   const [fgts, setFgts] = useState<number | null>(num(unidade.fgts));
   const [recursoProprio, setRecursoProprio] = useState<number | null>(num(unidade.recurso_proprio));
   const [financiado, setFinanciado] = useState<number | null>(num(unidade.valor_financiado));
+  const [corretorId, setCorretorId] = useState(unidade.corretor_id ?? "");
   const [confirmandoDesconto, setConfirmandoDesconto] = useState(false);
   const [erro, setErro] = useState("");
 
   const mostraVenda = status === "vendido" || status === "reservado" || status === "pre_reserva";
+
+  // Admin pode atribuir/transferir a negociação a um corretor
+  const { data: responsaveis = [] } = useQuery({
+    queryKey: ["leads-responsaveis"],
+    queryFn: () => leadsApi.responsaveis(),
+    enabled: !isCorretor && mostraVenda,
+  });
 
   // Composição de pagamento: a soma deve fechar o valor negociado
   const temComposicao = [subsidio, fgts, recursoProprio, financiado].some(v => v != null && v > 0);
@@ -63,8 +82,18 @@ function UnidadeModal({ unidade, onClose }: { unidade: Unidade; onClose: () => v
   const fechou = Math.abs(diferenca) < 0.01;
   const entradaSugerida = (negociado ?? 0) - (subsidio ?? 0) - (fgts ?? 0) - (financiado ?? 0);
 
-  const salvar = useMutation({
-    mutationFn: () => unidadesApi.atualizar(unidade.id, {
+  function montarPayload(): Partial<Unidade> {
+    const negociacao = {
+      cliente_nome: mostraVenda ? (cliente || null) : null,
+      valor_venda: mostraVenda ? negociado : null,
+      subsidio: mostraVenda ? subsidio : null,
+      fgts: mostraVenda ? fgts : null,
+      recurso_proprio: mostraVenda ? recursoProprio : null,
+      valor_financiado: mostraVenda ? financiado : null,
+    };
+    // Corretor só envia status, observação e negociação — o resto é do admin
+    if (isCorretor) return { status, observacao: obs || null, ...negociacao };
+    return {
       status,
       custo,
       valor_avaliacao: avaliacao,
@@ -72,13 +101,13 @@ function UnidadeModal({ unidade, onClose }: { unidade: Unidade; onClose: () => v
       area_privativa_m2: area ? Number(area.replace(/\./g, "").replace(",", ".")) : null,
       observacao: obs || null,
       orientacao_solar: orientacao || null,
-      cliente_nome: mostraVenda ? (cliente || null) : null,
-      valor_venda: mostraVenda ? negociado : null,
-      subsidio: mostraVenda ? subsidio : null,
-      fgts: mostraVenda ? fgts : null,
-      recurso_proprio: mostraVenda ? recursoProprio : null,
-      valor_financiado: mostraVenda ? financiado : null,
-    }),
+      ...negociacao,
+      ...(corretorId !== (unidade.corretor_id ?? "") ? { corretor_id: corretorId || null } : {}),
+    };
+  }
+
+  const salvar = useMutation({
+    mutationFn: () => unidadesApi.atualizar(unidade.id, montarPayload()),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["unidades"] });
       qc.invalidateQueries({ queryKey: ["espelho-resumo"] });
@@ -106,6 +135,8 @@ function UnidadeModal({ unidade, onClose }: { unidade: Unidade; onClose: () => v
     salvar.mutate();
   }
 
+  const statusVisiveis = isCorretor ? STATUS_CORRETOR : STATUS_ORDEM;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       {confirmandoDesconto && negociado != null && valorDeVenda != null && (
@@ -126,12 +157,34 @@ function UnidadeModal({ unidade, onClose }: { unidade: Unidade; onClose: () => v
           </button>
         </div>
 
+        {bloqueada ? (
+          // ── Visão somente leitura: unidade de outro corretor ou travada pelo admin
+          <div className="px-6 py-5 space-y-4">
+            <div className="flex items-start gap-3 rounded-lg bg-orange-50 border border-orange-200 px-3 py-3">
+              <Lock size={16} className="text-orange-600 mt-0.5 shrink-0" />
+              <p className="text-sm text-orange-800">
+                {unidade.corretor_nome
+                  ? <>Em negociação com <strong>{unidade.corretor_nome}</strong>. Só ele(a) ou um administrador pode alterar esta unidade.</>
+                  : <>Unidade <strong>{STATUS[unidade.status].label.toLowerCase()}</strong>. Só um administrador pode alterá-la.</>}
+              </p>
+            </div>
+            <dl className="grid grid-cols-2 gap-3 text-sm">
+              <div><dt className="text-xs text-slate-500">Status</dt><dd className="font-medium text-slate-800">{STATUS[unidade.status].label}</dd></div>
+              <div><dt className="text-xs text-slate-500">Valor de Venda</dt><dd className="font-medium text-slate-800">{unidade.preco_tabela ? fmt(Number(unidade.preco_tabela)) : "—"}</dd></div>
+              <div><dt className="text-xs text-slate-500">Área privativa</dt><dd className="font-medium text-slate-800">{unidade.area_privativa_m2 ? `${unidade.area_privativa_m2} m²` : "—"}</dd></div>
+              <div><dt className="text-xs text-slate-500">Orientação</dt><dd className="font-medium text-slate-800">{unidade.orientacao_solar ? ORIENTACOES[unidade.orientacao_solar] : "—"}</dd></div>
+            </dl>
+            <button onClick={onClose} className="w-full px-4 py-2.5 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">
+              Fechar
+            </button>
+          </div>
+        ) : (
         <div className="px-6 py-5 space-y-4">
           {/* Status — pills clicáveis */}
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1.5">Status</label>
             <div className="grid grid-cols-3 gap-1.5">
-              {STATUS_ORDEM.map(s => (
+              {statusVisiveis.map(s => (
                 <button key={s} onClick={() => setStatus(s)}
                   className={clsx(
                     "py-1.5 rounded-lg text-xs font-medium border-2 transition-all",
@@ -143,28 +196,48 @@ function UnidadeModal({ unidade, onClose }: { unidade: Unidade; onClose: () => v
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <CurrencyInput label="Custo" nullable small value={custo} onChange={setCusto} placeholder="Ex: 220.000,00" />
-            <CurrencyInput label="Valor de Avaliação" nullable small value={avaliacao} onChange={setAvaliacao} placeholder="Ex: 330.000,00" />
-            <CurrencyInput label="Valor de Venda" nullable small value={valorDeVenda} onChange={setValorDeVenda} placeholder="Ex: 350.000,00" />
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-slate-700">Área privativa (m²)</label>
-              <input value={area} onChange={e => setArea(e.target.value.replace(/[^\d,]/g, ""))}
-                inputMode="decimal" className={inputClass} placeholder="Ex: 48,50" />
-            </div>
-          </div>
+          {isCorretor ? (
+            // Corretor vê os dados da unidade, mas não altera valores nem características
+            <dl className="grid grid-cols-3 gap-3 text-sm bg-slate-50 rounded-lg px-3 py-2.5">
+              <div><dt className="text-xs text-slate-500">Valor de Venda</dt><dd className="font-semibold text-slate-800">{valorDeVenda ? fmt(valorDeVenda) : "—"}</dd></div>
+              <div><dt className="text-xs text-slate-500">Área</dt><dd className="font-medium text-slate-800">{unidade.area_privativa_m2 ? `${unidade.area_privativa_m2} m²` : "—"}</dd></div>
+              <div><dt className="text-xs text-slate-500">Orientação</dt><dd className="font-medium text-slate-800">{unidade.orientacao_solar ? ORIENTACOES[unidade.orientacao_solar] : "—"}</dd></div>
+            </dl>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <CurrencyInput label="Custo" nullable small value={custo} onChange={setCusto} placeholder="Ex: 220.000,00" />
+                <CurrencyInput label="Valor de Avaliação" nullable small value={avaliacao} onChange={setAvaliacao} placeholder="Ex: 330.000,00" />
+                <CurrencyInput label="Valor de Venda" nullable small value={valorDeVenda} onChange={setValorDeVenda} placeholder="Ex: 350.000,00" />
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-medium text-slate-700">Área privativa (m²)</label>
+                  <input value={area} onChange={e => setArea(e.target.value.replace(/[^\d,]/g, ""))}
+                    inputMode="decimal" className={inputClass} placeholder="Ex: 48,50" />
+                </div>
+              </div>
 
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1.5">Orientação solar</label>
-            <select value={orientacao} onChange={e => setOrientacao(e.target.value)} className={clsx(inputClass, "bg-white")}>
-              <option value="">— Não definida —</option>
-              {Object.entries(ORIENTACOES).map(([v, label]) => <option key={v} value={v}>{label}</option>)}
-            </select>
-          </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1.5">Orientação solar</label>
+                <select value={orientacao} onChange={e => setOrientacao(e.target.value)} className={clsx(inputClass, "bg-white")}>
+                  <option value="">— Não definida —</option>
+                  {Object.entries(ORIENTACOES).map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+                </select>
+              </div>
+            </>
+          )}
 
           {mostraVenda && (
             <div className="space-y-3 bg-slate-50 rounded-lg p-3 border border-slate-200">
               <p className="text-xs font-semibold text-slate-600">Dados da negociação</p>
+              {!isCorretor && (
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1.5">Corretor responsável</label>
+                  <select value={corretorId} onChange={e => setCorretorId(e.target.value)} className={clsx(inputClass, "bg-white")}>
+                    <option value="">{unidade.corretor_id ? "— Sem corretor —" : "— Eu (quem salvar) —"}</option>
+                    {responsaveis.map(r => <option key={r.id} value={r.id}>{r.nome}</option>)}
+                  </select>
+                </div>
+              )}
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1.5">Cliente</label>
                 <input value={cliente} onChange={e => setCliente(e.target.value)} className={inputClass} placeholder="Nome do comprador" />
@@ -215,10 +288,12 @@ function UnidadeModal({ unidade, onClose }: { unidade: Unidade; onClose: () => v
           )}
 
           <div className="flex gap-2 pt-1">
-            <button onClick={() => excluir.mutate()} disabled={excluir.isPending}
-              className="p-2.5 rounded-lg text-red-500 border border-red-200 hover:bg-red-50" title="Excluir unidade">
-              <Trash2 size={16} />
-            </button>
+            {!isCorretor && (
+              <button onClick={() => excluir.mutate()} disabled={excluir.isPending}
+                className="p-2.5 rounded-lg text-red-500 border border-red-200 hover:bg-red-50" title="Excluir unidade">
+                <Trash2 size={16} />
+              </button>
+            )}
             <button onClick={onClose} className="flex-1 px-4 py-2.5 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">
               Cancelar
             </button>
@@ -229,6 +304,7 @@ function UnidadeModal({ unidade, onClose }: { unidade: Unidade; onClose: () => v
             </button>
           </div>
         </div>
+        )}
       </div>
     </div>
   );
@@ -238,6 +314,9 @@ function UnidadeModal({ unidade, onClose }: { unidade: Unidade; onClose: () => v
 
 export function EspelhoDigital() {
   const navigate = useNavigate();
+  const papel = useAuthStore(s => s.user?.papel);
+  const meuId = useAuthStore(s => s.user?.id);
+  const isCorretor = papel === "corretor";
   const [empId, setEmpId] = useState<string>("");
   const [editando, setEditando] = useState<Unidade | null>(null);
 
@@ -287,7 +366,7 @@ export function EspelhoDigital() {
               {lista.length === 0 && <option value="">— Sem empreendimentos —</option>}
               {lista.map((e: any) => <option key={e.id} value={e.id}>{e.nome}</option>)}
             </select>
-            {empSelecionado && (
+            {empSelecionado && !isCorretor && (
               <button onClick={() => navigate(`/espelho/${empSelecionado}/gerar`)}
                 className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 whitespace-nowrap">
                 <Plus size={15} /> Cadastrar unidades
@@ -351,7 +430,7 @@ export function EspelhoDigital() {
               <div className="bg-white rounded-2xl border border-slate-100 shadow-sm py-16 text-center text-slate-400">
                 <Layers size={32} className="mx-auto mb-3 text-slate-300" />
                 <p className="text-sm font-medium">Nenhuma unidade cadastrada</p>
-                <p className="text-xs mt-1">Use "Gerar" para criar as unidades de uma quadra ou torre.</p>
+                <p className="text-xs mt-1">{isCorretor ? "O administrador ainda não cadastrou as unidades deste empreendimento." : "Use \"Cadastrar unidades\" para criar as unidades do empreendimento."}</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -364,10 +443,11 @@ export function EspelhoDigital() {
                     <div className="grid grid-cols-4 sm:grid-cols-8 lg:grid-cols-12 gap-1.5">
                       {us.map(u => (
                         <button key={u.id} onClick={() => setEditando(u)}
-                          title={`${u.identificador} · ${STATUS[u.status].label}${u.area_privativa_m2 ? " · " + u.area_privativa_m2 + "m²" : ""}${u.orientacao_solar ? " · " + ORIENTACOES[u.orientacao_solar] : ""}${u.cliente_nome ? " · " + u.cliente_nome : ""}`}
+                          title={`${u.identificador} · ${STATUS[u.status].label}${u.area_privativa_m2 ? " · " + u.area_privativa_m2 + "m²" : ""}${u.orientacao_solar ? " · " + ORIENTACOES[u.orientacao_solar] : ""}${u.corretor_nome ? " · Corretor: " + u.corretor_nome : ""}${u.cliente_nome ? " · " + u.cliente_nome : ""}`}
                           className={clsx(
                             "aspect-square rounded-lg flex flex-col items-center justify-center text-[11px] font-semibold leading-none transition-all hover:scale-105 hover:shadow-md",
-                            STATUS[u.status].cell
+                            STATUS[u.status].cell,
+                            isCorretor && u.corretor_id === meuId && "ring-2 ring-offset-2 ring-brand-600",
                           )}>
                           <span>{u.identificador}</span>
                         </button>
@@ -378,6 +458,12 @@ export function EspelhoDigital() {
 
                 {/* Legenda */}
                 <div className="flex flex-wrap gap-3 px-1 pt-1">
+                  {isCorretor && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-3 h-3 rounded ring-2 ring-offset-1 ring-brand-600 bg-white" />
+                      <span className="text-xs text-slate-500">Suas negociações</span>
+                    </div>
+                  )}
                   {STATUS_ORDEM.map(s => (
                     <div key={s} className="flex items-center gap-1.5">
                       <span className={clsx("w-3 h-3 rounded", STATUS[s].cell.split(" ")[0])} />

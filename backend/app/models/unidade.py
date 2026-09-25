@@ -51,6 +51,11 @@ class Unidade(Base, TenantMixin, TimestampMixin):
         Enum(StatusUnidade, native_enum=False), default=StatusUnidade.disponivel, index=True
     )
 
+    # Corretor que está negociando a unidade — só ele ou um admin altera
+    corretor_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+
     # Dados da venda — preenchidos quando reservado/vendido
     cliente_nome: Mapped[str | None] = mapped_column(String(200), nullable=True)
     valor_venda: Mapped[float | None] = mapped_column(NUMERIC(15, 2), nullable=True)  # "Valor negociado" na tela

@@ -78,3 +78,9 @@ CurrentUser = Annotated[User, Depends(get_current_user)]
 CurrentTenant = Annotated[Tenant, Depends(get_current_tenant)]
 AdminOnly = Annotated[User, Depends(require_papel(Papel.admin))]
 EngineiroOuAdmin = Annotated[User, Depends(require_papel(Papel.admin, Papel.engenheiro))]
+# Qualquer papel interno — corretores ficam de fora (ex: cadastrar/excluir unidades)
+NaoCorretor = Annotated[User, Depends(require_papel(*[p for p in Papel if p != Papel.corretor]))]
+
+
+def is_corretor(user: User) -> bool:
+    return user.papel == Papel.corretor
