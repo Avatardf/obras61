@@ -16,8 +16,10 @@ from app.models.documentos import DocumentoStatus
 from app.models.equipe import Colaborador, Equipe, EquipeAlocacao, TipoVinculo
 from app.models.unidade import Unidade, StatusUnidade
 from app.models.lead import Lead, EtapaFunil
+from app.models.catalogo import MaterialCatalogo
 
 __all__ = [
+    "MaterialCatalogo",
     "Tenant", "User",
     "Empreendimento", "EstimativaCusto", "Obra", "Etapa", "Atividade",
     "Orcamento", "ItemOrcamento", "CustoRealizado",

@@ -9,6 +9,7 @@ import { clsx } from "clsx";
 import { orcamentosApi } from "@/api/client";
 import { Select } from "@/components/ui/Input";
 import { CurrencyInput } from "@/components/ui/CurrencyInput";
+import { BuscaMaterial } from "@/components/catalogo/BuscaMaterial";
 import type { ItemOrcamentoCreate, OrcamentoDetalhe as OrcDetalhe, OrigemPreco } from "@/types";
 
 // ── Formatters ─────────────────────────────────────────────────────────────────
@@ -100,11 +101,20 @@ function NovoItemForm({
               onChange={e => set("codigo_composicao", e.target.value || null)}
               className="col-span-3 px-2.5 py-2 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-brand-400"
             />
-            <input
-              placeholder="Descrição do serviço / material *"
-              value={form.descricao}
-              onChange={e => set("descricao", e.target.value)}
-              className="col-span-9 px-2.5 py-2 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-brand-400"
+            <BuscaMaterial
+              placeholder="Descrição do serviço / material * (digite para buscar no catálogo)"
+              valor={form.descricao}
+              onChange={v => set("descricao", v)}
+              onEscolher={m => setForm(f => ({
+                ...f,
+                descricao: m.descricao,
+                unidade: m.unidade,
+                codigo_composicao: m.codigo ?? f.codigo_composicao,
+                custo_unitario: m.preco_referencia != null ? Number(m.preco_referencia) : f.custo_unitario,
+                origem_preco: "proprio",
+              }))}
+              className="col-span-9"
+              inputClassName="px-2.5 py-2 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-brand-400"
             />
           </div>
 

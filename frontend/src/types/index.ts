@@ -806,10 +806,14 @@ export interface GerarOCSelecao {
 // ── Catálogo de Materiais ──────────────────────────────────────────────────────
 
 export interface Material {
+  id: string;
   codigo: string | null;
   descricao: string;
   unidade: string;
   familia: string | null;
+  preco_referencia: number | null;
+  ativo: boolean;
+  origem: "padrao" | "proprio" | "planilha";
 }
 
 // ── Centro de Custo ────────────────────────────────────────────────────────────

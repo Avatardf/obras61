@@ -32,6 +32,8 @@ class Tenant(Base, TimestampMixin):
     cnpj: Mapped[str] = mapped_column(String(18), unique=True)
     plano: Mapped[Plano] = mapped_column(Enum(Plano, native_enum=False), default=Plano.starter)
     ativo: Mapped[bool] = mapped_column(Boolean, default=True)
+    # True depois que a base padrão de materiais foi copiada para a construtora
+    catalogo_inicializado: Mapped[bool] = mapped_column(Boolean, default=False)
 
     users: Mapped[list["User"]] = relationship(back_populates="tenant")
 

@@ -25,6 +25,7 @@ export const PERMISSOES: Record<string, Papel[]> = {
   "/orcamentos":     ["admin","engenheiro","financeiro","viewer"],
   "/rdos":           ["admin","engenheiro","mestre","viewer"],
   "/suprimentos":    ["admin","engenheiro","mestre","comprador","financeiro","viewer"],
+  "/catalogo":       ["admin","engenheiro","mestre","comprador","financeiro","viewer"],
   "/financeiro":     ["admin","engenheiro","financeiro","viewer"],
   "/conciliacao":    ["admin","financeiro","viewer"],
   "/equipes":        ["admin","engenheiro","mestre","viewer"],
@@ -43,6 +44,11 @@ export function podAcessar(papel: string | undefined, rota: string): boolean {
   const raiz = "/" + rota.split("/").filter(Boolean)[0] || "/";
   const permitidos = PERMISSOES[raiz] ?? PERMISSOES[rota] ?? [];
   return permitidos.includes(papel as Papel);
+}
+
+/** Pode alterar o catálogo de materiais (espelha a regra do backend) */
+export function podeEditarCatalogo(papel: string | undefined): boolean {
+  return papel === "admin" || papel === "engenheiro" || papel === "comprador";
 }
 
 /** Primeira tela do papel após o login (quando o painel "/" não está liberado) */

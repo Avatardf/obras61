@@ -17,6 +17,7 @@ import { Pipeline } from "@/pages/Pipeline";
 import { Qualidade } from "@/pages/Qualidade";
 import { RDODetalhe } from "@/pages/RDODetalhe";
 import { Suprimentos } from "@/pages/Suprimentos";
+import { CatalogoMateriais } from "@/pages/CatalogoMateriais";
 import { Conciliacao } from "@/pages/Conciliacao";
 import { Documentos } from "@/pages/Documentos";
 import { Usuarios } from "@/pages/Usuarios";
@@ -32,6 +33,7 @@ const titulos: Record<string, string> = {
   "/cronograma":     "Cronograma Gantt",
   "/orcamentos":     "Orçamentos",
   "/suprimentos":    "Suprimentos",
+  "/catalogo":       "Catálogo de Materiais",
   "/financeiro":     "Financeiro",
   "/equipes":        "Equipes",
   "/espelho":        "Espelho Digital",
@@ -162,6 +164,11 @@ export default function App() {
         <Route path="/cronograma" element={
           <PrivatePage path="/cronograma">
             <CronogramaGantt />
+          </PrivatePage>
+        } />
+        <Route path="/catalogo" element={
+          <PrivatePage path="/catalogo">
+            <CatalogoMateriais />
           </PrivatePage>
         } />
         <Route path="/suprimentos" element={

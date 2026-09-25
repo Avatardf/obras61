@@ -316,11 +316,54 @@ export const cotacoesApi = {
     api.get(`/api/v1/cotacoes/${id}/arquivo`, { responseType: "blob" }).then(r => r.data),
 };
 
+export interface ResultadoImportacao {
+  simulado: boolean;
+  modo: "adicionar" | "substituir";
+  novos: number;
+  atualizados: number;
+  sem_alteracao: number;
+  ocultados: number;
+  erros: string[];
+  total_erros: number;
+}
+
+export type MaterialInput = {
+  codigo?: string | null;
+  descricao: string;
+  unidade: string;
+  familia?: string | null;
+  preco_referencia?: number | null;
+};
+
 export const catalogoApi = {
-  listarMateriais: (params?: { q?: string; familia?: string; limit?: number }) =>
+  listarMateriais: (params?: { q?: string; familia?: string; limit?: number; offset?: number; incluir_inativos?: boolean }) =>
     api.get("/api/v1/materiais", { params }).then(r => r.data) as Promise<{ total: number; items: import("@/types").Material[] }>,
   listarFamilias: () =>
     api.get("/api/v1/materiais/familias").then(r => r.data) as Promise<string[]>,
+  criar: (data: MaterialInput): Promise<import("@/types").Material> =>
+    api.post("/api/v1/materiais", data).then(r => r.data),
+  atualizar: (id: string, data: Partial<MaterialInput> & { ativo?: boolean }): Promise<import("@/types").Material> =>
+    api.patch(`/api/v1/materiais/${id}`, data).then(r => r.data),
+  excluir: (id: string): Promise<void> =>
+    api.delete(`/api/v1/materiais/${id}`).then(() => undefined),
+  importar: (arquivo: File, modo: "adicionar" | "substituir", simular: boolean): Promise<ResultadoImportacao> => {
+    const form = new FormData();
+    form.append("arquivo", arquivo);
+    form.append("modo", modo);
+    form.append("simular", String(simular));
+    return api.post("/api/v1/materiais/importar", form, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }).then(r => r.data);
+  },
+  baixarModelo: async () => {
+    const r = await api.get("/api/v1/materiais/modelo", { responseType: "blob" });
+    const url = URL.createObjectURL(r.data);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "modelo_catalogo_materiais.xlsx";
+    a.click();
+    URL.revokeObjectURL(url);
+  },
 };
 
 export const centroCustoApi = {
